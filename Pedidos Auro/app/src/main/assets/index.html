@@ -108,6 +108,30 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
 .sheet p{margin:0;font-size:12px;color:var(--soft)}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%;text-align:center}
 .toast.on{opacity:1}
+.selC{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:11px 12px;font-size:16px;outline:none}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 10px 9px;min-width:0}
+.kpi span{display:block;font-size:12px;color:var(--soft)}
+.kpi b{display:block;font-size:16px;margin:3px 0 1px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi small{font-size:11px;color:var(--soft)}
+.kpi.main{background:var(--brand);border-color:var(--brand);color:#fff}
+.kpi.main span,.kpi.main small{color:rgba(255,255,255,.75)}
+.bh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bh select{border:1px solid var(--line);border-radius:9px;background:#fff;padding:5px 8px;font-size:14px;font-weight:600}
+.chart{display:flex;align-items:flex-end;gap:4px;padding-top:6px}
+.chart .c{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.chart .v{font-size:9px;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums;margin-bottom:2px;min-height:11px}
+.chart .b{width:100%;max-width:38px;background:var(--accent);border-radius:5px 5px 0 0}
+.chart .c.now .b{background:var(--brand)}
+.chart .c.now .l{color:var(--ink);font-weight:700}
+.chart .l{font-size:10px;color:var(--soft);margin-top:4px;white-space:nowrap}
+.chart-base{border-top:1px solid var(--line);margin-top:-1px}
+.cr{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:9px 0 0;width:100%;border-left:0;border-right:0;border-bottom:0;background:none;text-align:left}
+.cr div{flex:1;min-width:0}
+.cr b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr span{font-size:12px;color:var(--soft)}
+.cr strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+.cr i{display:block;height:4px;border-radius:2px;background:var(--accent);margin-top:4px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -119,6 +143,7 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
   <header>
     <div class="h-row">
       <select class="selT" id="selT" aria-label="Tarifa"></select>
+      <button class="hb" id="goEst">Resumen</button>
       <button class="hb" id="goHist">Historial</button>
       <button class="hb" id="goDat">Datos</button>
     </div>
@@ -143,15 +168,15 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
       <div class="sug" id="sug" hidden></div>
       <div class="cliH" id="cliH"></div>
     </div>
-    <div class="field"><label for="tel">Teléfono de WhatsApp (opcional)</label><input id="tel" type="tel" inputmode="tel" placeholder="Ej. 600 123 456" autocomplete="off"><small>Si lo dejas vacío, WhatsApp te dejará elegir el chat o grupo.</small></div>
+    <div class="field"><label for="tel">Teléfono del cliente (opcional)</label><input id="tel" type="tel" inputmode="tel" placeholder="Ej. 600 123 456" autocomplete="off"><small>Solo se guarda como dato del cliente. Al enviar eliges tú la app y el destinatario.</small></div>
     <div class="field"><label for="obs">Observaciones</label><textarea id="obs" placeholder="Entrega, condiciones…"></textarea></div>
     <div class="list" id="pedList" style="padding:0"></div>
     <div class="sum"><div><div>Total</div><span>sin impuestos</span></div><b id="sumTot">0,00 €</b></div>
-    <a class="btn wa" id="wa" target="_blank" rel="noopener" href="#">Enviar por WhatsApp</a>
+    <a class="btn wa" id="wa" target="_blank" rel="noopener" href="#">Enviar pedido…</a>
     <div class="row"><button class="btn ghost" id="saveH">Guardar en historial</button><button class="btn ghost" id="copy">Copiar texto</button></div>
     <button class="btn del" id="clear">Nuevo pedido (vaciar)</button>
     <div class="field"><label>Vista previa del mensaje</label><div class="prev" id="prev"></div></div>
-    <p class="note">El pedido se guarda en el historial al enviarlo por WhatsApp o al pulsar «Guardar en historial».</p>
+    <p class="note">El pedido se guarda en el historial al enviarlo o al pulsar «Guardar en historial».</p>
   </div>
 </section>
 
@@ -162,6 +187,28 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
     <div class="search"><input id="hq" type="search" placeholder="Buscar cliente…" autocomplete="off"></div>
   </header>
   <div class="pane" id="histList"></div>
+</section>
+
+<!-- RESUMEN -->
+<section id="vEst" hidden>
+  <header><div class="h-row"><button class="hb" data-back>‹ Tarifa</button><h1>Resumen<small id="estSub">Importe de los pedidos guardados</small></h1></div></header>
+  <div class="pane">
+    <div class="field"><label for="eCli">Cliente</label><select class="selC" id="eCli"></select></div>
+    <div class="kpis" id="eKpi"></div>
+    <div class="box">
+      <div class="bh"><h2>Total por meses</h2><select id="eYear" aria-label="Año"></select></div>
+      <div id="eMon"></div>
+    </div>
+    <div class="box">
+      <div class="bh"><h2>Total por años</h2></div>
+      <div id="eYrs"></div>
+    </div>
+    <div class="box" id="eCliBox">
+      <div class="bh"><h2 id="eCliT">Por cliente</h2><select id="ePer" aria-label="Periodo"><option value="d">Hoy</option><option value="m">Este mes</option><option value="y" selected>Año</option><option value="a">Siempre</option></select></div>
+      <div id="eCliL"></div>
+    </div>
+    <p class="note">Importes sin impuestos. Se cuentan los pedidos guardados en el historial, por la fecha en que se guardaron.</p>
+  </div>
 </section>
 
 <!-- DATOS -->
@@ -370,8 +417,7 @@ function renderPedTotals() {
   $('sumTot').textContent = eur(total());
   const msg = message();
   $('prev').textContent = n ? msg : '—';
-  let tel = S.meta.tel.replace(/\D/g, ''); if (tel.length === 9) tel = '34' + tel;
-  $('wa').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+  $('wa').href = 'https://wa.me/?text=' + encodeURIComponent(msg);
   ['wa', 'copy', 'saveH'].forEach(id => $(id).classList.toggle('off', !n));
   renderCliH();
 }
@@ -515,7 +561,7 @@ function renderHist() {
   groups.forEach(x => { x.os.sort((a, b) => b.ts - a.ts); x.tot = r2(x.os.reduce((s, o) => s + o.total, 0)); x.name = x.os[0].cli; });
   groups.sort((a, b) => b.os[0].ts - a.os[0].ts);
   $('histSub').textContent = H.length ? `${H.length} ${H.length === 1 ? 'pedido' : 'pedidos'} · ${eur(H.reduce((s, o) => s + o.total, 0))}` : 'Sin pedidos guardados';
-  if (!groups.length) { $('histList').innerHTML = `<div class="empty">${H.length ? 'Ningún cliente coincide con la búsqueda.' : 'Todavía no hay pedidos guardados. Se guardan al enviarlos por WhatsApp.'}</div>`; return; }
+  if (!groups.length) { $('histList').innerHTML = `<div class="empty">${H.length ? 'Ningún cliente coincide con la búsqueda.' : 'Todavía no hay pedidos guardados. Se guardan al enviarlos.'}</div>`; return; }
   $('histList').innerHTML = groups.map(x => {
     const open = openCli === x.k;
     const body = !open ? '' : x.os.map(o => {
@@ -549,6 +595,74 @@ $('histList').addEventListener('click', e => {
   }
 });
 $('hq').addEventListener('input', renderHist);
+
+// ---------- resumen ----------
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+let estCli = '', estYear = null;
+const short = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n >= 1e3 ? (n / 1e3).toFixed(1).replace('.', ',') + 'k' : String(Math.round(n));
+const sumO = os => r2(os.reduce((s, o) => s + (+o.total || 0), 0));
+const nPed = n => n + (n === 1 ? ' pedido' : ' pedidos');
+function barsHTML(items, h) {
+  const max = Math.max(0, ...items.map(x => x.v));
+  return `<div class="chart">${items.map(x => {
+    const px = max > 0 ? Math.max(x.v > 0 ? 3 : 0, Math.round(x.v / max * h)) : 0;
+    return `<div class="c${x.now ? ' now' : ''}" title="${esc(x.t + ': ' + eur(x.v))}"><div class="v">${x.v > 0 ? short(x.v) : ''}</div><div class="b" style="height:${px}px"></div><div class="l">${esc(x.l)}</div></div>`;
+  }).join('')}</div>`;
+}
+function renderEst() {
+  // clientes con pedidos
+  const g = {};
+  H.forEach(o => { const k = cliKey(o.cli); if (!g[k] || g[k].ts < o.ts) g[k] = {k, name: o.cli, ts: o.ts}; });
+  const cls = Object.values(g).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  if (estCli && !g[estCli]) estCli = '';
+  $('eCli').innerHTML = `<option value="">Todos los clientes</option>` + cls.map(c => `<option value="${esc(c.k)}"${c.k === estCli ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+  const os = estCli ? H.filter(o => cliKey(o.cli) === estCli) : H;
+  const now = new Date(), Y = now.getFullYear(), Mo = now.getMonth(), D = now.getDate();
+  const dt = o => new Date(o.ts);
+  const inDay = o => { const d = dt(o); return d.getFullYear() === Y && d.getMonth() === Mo && d.getDate() === D; };
+  const inMon = o => { const d = dt(o); return d.getFullYear() === Y && d.getMonth() === Mo; };
+  const inYr = o => dt(o).getFullYear() === Y;
+  const kd = os.filter(inDay), km = os.filter(inMon), ky = os.filter(inYr);
+  $('estSub').textContent = estCli ? g[estCli].name : (H.length ? `${nPed(H.length)} en el historial` : 'Sin pedidos guardados');
+  $('eKpi').innerHTML = [
+    ['Hoy', kd, 'main'], [MESES_L[Mo][0].toUpperCase() + MESES_L[Mo].slice(1), km, ''], ['Año ' + Y, ky, '']
+  ].map(([t, l, c]) => `<div class="kpi ${c}"><span>${esc(t)}</span><b>${eur(sumO(l))}</b><small>${nPed(l.length)}</small></div>`).join('');
+
+  // años con pedidos (siempre incluye el actual)
+  const yrs = [...new Set(os.map(o => dt(o).getFullYear()).concat(Y))].sort((a, b) => a - b);
+  if (estYear == null || !yrs.includes(estYear)) estYear = Y;
+  $('eYear').innerHTML = yrs.slice().reverse().map(y => `<option value="${y}"${y === estYear ? ' selected' : ''}>${y}</option>`).join('');
+  const mon = MESES.map((l, i) => {
+    const v = sumO(os.filter(o => { const d = dt(o); return d.getFullYear() === estYear && d.getMonth() === i; }));
+    return {l, t: MESES_L[i] + ' ' + estYear, v, now: estYear === Y && i === Mo};
+  });
+  const yTot = r2(mon.reduce((s, x) => s + x.v, 0));
+  $('eMon').innerHTML = barsHTML(mon, 140) + `<p style="margin-top:8px">Total ${estYear}: <b style="color:var(--ink)">${eur(yTot)}</b></p>`;
+  const yAll = yrs.map(y => ({l: String(y), t: 'Año ' + y, v: sumO(os.filter(o => dt(o).getFullYear() === y)), now: y === Y}));
+  $('eYrs').innerHTML = barsHTML(yAll, 140) + `<p style="margin-top:8px">Total acumulado: <b style="color:var(--ink)">${eur(sumO(os))}</b></p>`;
+
+  // desglose por cliente (solo con «Todos»)
+  $('eCliBox').hidden = !!estCli || !H.length;
+  if (!estCli && H.length) {
+    const per = $('ePer').value;
+    const f = per === 'd' ? inDay : per === 'm' ? inMon : per === 'y' ? (o => dt(o).getFullYear() === estYear) : (() => true);
+    $('ePer').options[2].textContent = 'Año ' + estYear;
+    const r = {};
+    H.filter(f).forEach(o => { const k = cliKey(o.cli); (r[k] = r[k] || {k, name: g[k].name, n: 0, v: 0}); r[k].n++; r[k].v += +o.total || 0; });
+    const rows = Object.values(r).sort((a, b) => b.v - a.v);
+    const max = rows.length ? rows[0].v : 0;
+    $('eCliL').innerHTML = rows.length ? rows.map(x => `<button class="cr" data-k="${esc(x.k)}"><div><b>${esc(x.name)}</b><span>${nPed(x.n)}</span><i style="width:${max > 0 ? Math.max(2, Math.round(x.v / max * 100)) : 0}%"></i></div><strong>${eur(x.v)}</strong></button>`).join('')
+      : '<p>No hay pedidos en este periodo.</p>';
+  }
+}
+$('eCli').addEventListener('change', () => { estCli = $('eCli').value; renderEst(); });
+$('eYear').addEventListener('change', () => { estYear = +$('eYear').value; renderEst(); });
+$('ePer').addEventListener('change', renderEst);
+$('eCliL').addEventListener('click', e => {
+  const b = e.target.closest('.cr'); if (!b) return;
+  estCli = b.dataset.k; renderEst(); window.scrollTo(0, 0);
+});
 
 // ---------- importación desde Excel ----------
 async function readBook(file) {
@@ -726,11 +840,12 @@ function renderView() {
   if (view === 'Cat') { renderSel(); renderChips(); renderList(); renderBar(); }
   else if (view === 'Ped') { renderPed(); renderBar(); }
   else if (view === 'Hist') renderHist();
+  else if (view === 'Est') renderEst();
   else renderDat();
 }
 function show(v) {
   view = v;
-  ['Cat', 'Ped', 'Hist', 'Dat'].forEach(x => { $('v' + x).hidden = x !== v; });
+  ['Cat', 'Ped', 'Hist', 'Est', 'Dat'].forEach(x => { $('v' + x).hidden = x !== v; });
   if (v === 'Dat') $('impMsg').hidden = true;
   renderView(); window.scrollTo(0, 0);
 }
@@ -754,6 +869,7 @@ $('selT').addEventListener('change', () => {
 $('goPed').addEventListener('click', () => show('Ped'));
 $('goHist').addEventListener('click', () => { openCli = null; openOrd = null; show('Hist'); });
 $('goDat').addEventListener('click', () => show('Dat'));
+$('goEst').addEventListener('click', () => { estCli = ''; estYear = null; show('Est'); });
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show('Cat')));
 
 // Dentro de la app Android: abrir WhatsApp directamente y botón atrás
@@ -765,9 +881,10 @@ window.appBack = () => {
 };
 $('wa').addEventListener('click', e => {
   if (!lines().length) { e.preventDefault(); return; }
-  const msg = message(), tel = S.meta.tel;
+  const msg = message();
   saveOrder(true); toast('Pedido guardado en el historial');
-  if (NATIVE) { e.preventDefault(); NATIVE.whatsapp(tel, msg); }
+  if (NATIVE) { e.preventDefault(); NATIVE.share(msg); }
+  else if (navigator.share) { e.preventDefault(); navigator.share({text: msg}).catch(() => {}); }
 });
 $('saveH').addEventListener('click', () => saveOrder(false));
 $('copy').addEventListener('click', async () => {
