@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.tarifa.pedidos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.tarifa.pedidos"
+        minSdk 26
+        targetSdk 34
+        versionCode 4
+        versionName "2.2"
+    }
+
+    // Firma fija: asi las versiones nuevas se instalan encima de la anterior
+    signingConfigs {
+        debug {
+            storeFile file('tarifa.keystore')
+            storePassword 'tarifa2026'
+            keyAlias 'tarifa'
+            keyPassword 'tarifa2026'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
