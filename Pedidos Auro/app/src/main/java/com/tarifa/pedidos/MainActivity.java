@@ -19,8 +19,6 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
-    private static final String[] WHATSAPP_PACKAGES = {"com.whatsapp", "com.whatsapp.w4b"};
-
     private static final int REQ_FILE = 1;
 
     private WebView web;
@@ -123,42 +121,33 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void sendWhatsApp(String phone, String text) {
-        String digits = phone == null ? "" : phone.replaceAll("\\D", "");
-        if (digits.isEmpty()) {
-            // Sin telefono: WhatsApp muestra la lista de chats y grupos
-            for (String pkg : WHATSAPP_PACKAGES) {
-                Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("text/plain");
-                send.putExtra(Intent.EXTRA_TEXT, text);
-                send.setPackage(pkg);
-                if (open(send)) {
-                    return;
-                }
-            }
-        }
-        Uri link = Uri.parse("https://wa.me/" + digits + "?text=" + Uri.encode(text));
-        for (String pkg : WHATSAPP_PACKAGES) {
-            Intent view = new Intent(Intent.ACTION_VIEW, link);
-            view.setPackage(pkg);
-            if (open(view)) {
-                return;
-            }
-        }
-        if (!open(new Intent(Intent.ACTION_VIEW, link))) {
-            Toast.makeText(this, "No se ha podido abrir WhatsApp", Toast.LENGTH_LONG).show();
+    // Abre el selector de Android: eliges la app (WhatsApp, Telegram, correo, SMS...)
+    // y dentro de ella el chat o contacto al que enviar el pedido.
+    private void sharePedido(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_SUBJECT, "Pedido");
+        send.putExtra(Intent.EXTRA_TEXT, text);
+        if (!open(Intent.createChooser(send, "Enviar pedido con..."))) {
+            Toast.makeText(this, "No hay ninguna app para enviar el pedido", Toast.LENGTH_LONG).show();
         }
     }
 
     private class Bridge {
         @JavascriptInterface
-        public void whatsapp(final String phone, final String text) {
+        public void share(final String text) {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    sendWhatsApp(phone, text);
+                    sharePedido(text);
                 }
             });
+        }
+
+        // Compatibilidad con versiones anteriores de index.html
+        @JavascriptInterface
+        public void whatsapp(final String phone, final String text) {
+            share(text);
         }
 
         @JavascriptInterface
