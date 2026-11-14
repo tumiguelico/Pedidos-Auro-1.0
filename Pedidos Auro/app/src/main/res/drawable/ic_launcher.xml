@@ -5,13 +5,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#3B2A1E"
+        android:fillColor="#5A3A1F"
         android:pathData="M0,0h108v108h-108z" />
     <!-- almendra -->
     <path
-        android:fillColor="#E9B872"
+        android:fillColor="#E8C27A"
         android:pathData="M54,24C40,36 34,50 34,62C34,75 43,84 54,84C65,84 74,75 74,62C74,50 68,36 54,24Z" />
     <path
-        android:fillColor="#B8651B"
+        android:fillColor="#A57A16"
         android:pathData="M53,36h2v40h-2z" />
 </vector>
