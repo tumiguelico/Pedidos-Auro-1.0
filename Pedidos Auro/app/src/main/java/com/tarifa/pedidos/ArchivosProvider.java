@@ -52,6 +52,9 @@ public class ArchivosProvider extends ContentProvider {
         if (name != null && name.toLowerCase().endsWith(".xlsx")) {
             return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         }
+        if (name != null && name.toLowerCase().endsWith(".json")) {
+            return "application/json";
+        }
         return "application/octet-stream";
     }
 
