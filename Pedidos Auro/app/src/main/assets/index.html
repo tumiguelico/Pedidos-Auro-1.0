@@ -1423,29 +1423,29 @@ function xPlan(k, pl) {
 }
 function xInf(k, inf) {
   const si = infSt(inf), rows = sortR(inf.rows), a = XL + 2, R = [];
-  R.push(xR(1, 25.5, xFill('ABCDEFGHIJK', 14, 'INFORME SEMANAL DE VISITAS — SEMANA EN VIGOR')));
+  R.push(xR(1, 25.5, xFill('ABCDEFGHIJ', 14, 'INFORME SEMANAL DE VISITAS — SEMANA EN VIGOR')));
   R.push(xR(3, 34.5, [['A', 1, 'Vendedor:'], ['C', 15, V.vend], ['D', 15], ['E', 1, 'Zona / Ruta:'], ['G', 22, V.zona], ['H', 15]]));
   R.push(xR(4, 25.5, [['A', 1, 'Semana (del/al):'], ['C', 15, `del ${dmy(k)} al ${dmy(addD(k, 6))}`], ['D', 15], ['E', 1, 'Fecha de entrega:'], ['G', 17, inf.ent ? xSer(inf.ent) : null], ['H', 15]]));
-  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Teléfono', 'Acción realizada', '¿Pedido?', 'Importe (€)', 'Próximas acciones', 'Potencial', 'Visita c/ Delegado', '¿Cliente nuevo?', 'Comentarios'].map((t, i) => ['ABCDEFGHIJK'[i], 2, t])));
+  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Teléfono', 'Acción realizada', '¿Pedido?', 'Importe (€)', 'Próximas acciones', 'Potencial', 'Visita c/ Delegado', '¿Cliente nuevo?'].map((t, i) => ['ABCDEFGHIJ'[i], 2, t])));
   for (let i = 0; i < MAXV; i++) {
     const r = rows[i], n = 7 + i;
-    if (!r) { R.push(xR(n, 18, [['A', 10], ['B', 3], ['C', 3], ['D', 3], ['E', 5], ['F', 6], ['G', 3], ['H', 5], ['I', 5], ['J', 5], ['K', 3]])); continue; }
-    R.push(xR(n, xHt(18, [[r.cli, 22], [r.acc, 26], [r.prox, 24], [r.com, 40]]), [['A', 10, xSer(r.d)], ['B', 3, r.cli], ['C', 3, r.tel], ['D', 3, r.acc], ['E', 5, r.ped || 'No'],
-      ['F', 6, r.ped === 'Sí' && r.imp != null ? +r.imp : null], ['G', 3, r.prox], ['H', 5, r.pot || 'No'], ['I', 5, r.del || 'No'], ['J', 5, r.nuevo ? 'Sí' : 'No'], ['K', 3, r.com]]));
+    if (!r) { R.push(xR(n, 18, [['A', 10], ['B', 3], ['C', 3], ['D', 3], ['E', 5], ['F', 6], ['G', 3], ['H', 5], ['I', 5], ['J', 5]])); continue; }
+    R.push(xR(n, xHt(18, [[r.cli, 22], [r.acc, 26], [r.prox, 24]]), [['A', 10, xSer(r.d)], ['B', 3, r.cli], ['C', 3, r.tel], ['D', 3, r.acc], ['E', 5, r.ped || 'No'],
+      ['F', 6, r.ped === 'Sí' && r.imp != null ? +r.imp : null], ['G', 3, r.prox], ['H', 5, r.pot || 'No'], ['I', 5, r.del || 'No'], ['J', 5, r.nuevo ? 'Sí' : 'No']]));
   }
-  R.push(xR(a, 18, xFill('ABCDEFGHIJK', 18, 'Resumen de control semanal')));
+  R.push(xR(a, 18, xFill('ABCDEFGHIJ', 18, 'Resumen de control semanal')));
   const sum = (n, l1, s1, v1, l2, v2) => xR(n, 18, [['A', 19, l1], ['B', 19], ['C', 19], ['D', s1, v1], ['E', 19, l2], ['F', 19], ['G', 19], ['H', 20, v2], ['I', 20]]);
   R.push(sum(a + 1, 'Nº total de visitas', 7, {f: `COUNTA(B7:B${XL})`, v: si.n}, 'Nº de pedidos conseguidos', {f: `COUNTIF(E7:E${XL},"Sí")`, v: si.ped}));
   R.push(sum(a + 2, 'Importe total de pedidos', 8, {f: `SUM(F7:F${XL})`, v: si.imp}, 'Nuevos clientes captados', {f: `COUNTIF(J7:J${XL},"Sí")`, v: si.nue}));
   R.push(sum(a + 3, 'Km recorridos', 7, si.km, 'Clientes potenciales detectados', {f: `COUNTIFS(B7:B${XL},"<>",H7:H${XL},"Sí")`, v: si.pot}));
   R.push(sum(a + 4, 'Clientes no localizados / cerrados', 7, si.noLoc, 'Incidencias o reclamaciones', si.inc));
-  R.push(xR(a + 6, 18, xFill('ABCDEFGHIJK', 18, 'Observaciones generales y plan para la semana siguiente')));
+  R.push(xR(a + 6, 18, xFill('ABCDEFGHIJ', 18, 'Observaciones generales y plan para la semana siguiente')));
   const hc = Math.max(19.5, xHt(19.5, [[inf.obs, 160]]) / 3);
-  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGHIJK', 21, j ? null : inf.obs)));
+  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGHIJ', 21, j ? null : inf.obs)));
   R.push(xR(a + 11, 0, [['A', 4, 'Firma del Vendedor:'], ['E', 4, 'Firma del Delegado:']]));
-  const m = ['A1:K1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:K${a}`, `A${a + 6}:K${a + 6}`, `A${a + 7}:K${a + 9}`];
+  const m = ['A1:J1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:J${a}`, `A${a + 6}:J${a + 6}`, `A${a + 7}:J${a + 9}`];
   for (let j = 1; j <= 4; j++) m.push(`A${a + j}:C${a + j}`, `E${a + j}:G${a + j}`, `H${a + j}:I${a + j}`);
-  return {last: a + 11, xml: xSheet({dim: `A1:K${a + 11}`, fz: 6, sel: true, cols: [19.86, 22, 14, 26, 12, 12, 24, 10, 12, 11, 40], rows: R, m, dv: [[`E7:E${XL} H7:J${XL}`, 'Sí,No']]})};
+  return {last: a + 11, xml: xSheet({dim: `A1:J${a + 11}`, fz: 6, sel: true, cols: [19.86, 22, 14, 26, 12, 12, 24, 10, 12, 11], rows: R, m, dv: [[`E7:E${XL} H7:J${XL}`, 'Sí,No']]})};
 }
 function xCmp(k, pl, inf, ia) {
   const sp = planSt(pl), si = infSt(inf), rows = sortR(pl.rows), L = 14 + MAXV, IS = `'${XSN[1]}'!`, R = [];
@@ -1501,7 +1501,7 @@ function buildVisXlsx(k) {
   syncOrders(k);
   const w = wk(k), next = wk(addD(k, 7));
   const s1 = xPlan(addD(k, 7), next.plan), s2 = xInf(k, w.inf), s3 = xCmp(k, w.plan, w.inf, XL + 2);
-  const pa = [`'${XSN[0]}'!$A$1:$H$${s1.last}`, `'${XSN[1]}'!$A$1:$K$${s2.last}`, `'${XSN[2]}'!$A$1:$F$${s3.last}`];
+  const pa = [`'${XSN[0]}'!$A$1:$H$${s1.last}`, `'${XSN[1]}'!$A$1:$J$${s2.last}`, `'${XSN[2]}'!$A$1:$F$${s3.last}`];
   const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/', CT = 'application/vnd.openxmlformats-officedocument.';
   return zipStore([
     ['[Content_Types].xml', X + `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${CT}spreadsheetml.sheet.main+xml"/>${[1, 2, 3].map(i => `<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="${CT}spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="${CT}spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="${CT}theme+xml"/></Types>`],
