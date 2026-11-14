@@ -16,6 +16,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Para enviar el Excel de visitas a otras apps -->
+        <provider
+            android:name=".ArchivosProvider"
+            android:authorities="${applicationId}.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>
