@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#3b2a1e">
+<meta name="theme-color" content="#5a3a1f">
 <title>Tarifa MP-MPC · Pedidos por WhatsApp</title>
 <style>
 :root{
-  --bg:#f6f1e9; --card:#fffdf9; --ink:#2b1f16; --soft:#7a6a5c; --line:#e6dccd;
-  --brand:#3b2a1e; --accent:#b8651b; --accent-bg:#fbeedd; --wa:#128c4a; --wa-d:#0c6b38; --danger:#b3261e;
+  --bg:#faf6ec; --card:#fffdf8; --ink:#2a1e12; --soft:#78684f; --line:#eadfc6;
+  --brand:#5a3a1f; --accent:#a57a16; --accent-bg:#f8edcf; --gold:#c99a2e; --wa:#128c4a; --wa-d:#0c6b38; --danger:#b3261e;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
@@ -158,6 +158,24 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
 .cmp th{text-align:right;font-size:12px;color:var(--soft);font-weight:600;padding:6px 4px}
 .cmp td{text-align:right;padding:8px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
 .cmp th:first-child,.cmp td:first-child{text-align:left}
+header{border-bottom:3px solid var(--gold)}
+.vd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.vd span{flex:1}
+.mbtn{border:1px solid var(--gold);background:var(--accent-bg);color:var(--brand);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;text-transform:none}
+.vr.vnew{background:var(--accent-bg);border:1px solid var(--gold);border-radius:12px;padding:9px 10px;margin-top:4px}
+.vr span.vstar,.ldb{color:#2f6b1f!important;font-weight:700}
+.ct{display:flex;gap:8px;flex-wrap:wrap}
+.ct:empty{display:none}
+.ld{display:flex;gap:10px;align-items:flex-start;border-top:1px solid var(--line);padding:10px 0 0}
+.ld>input{width:22px;height:22px;flex:none;margin-top:2px}
+.ldm{flex:1;min-width:0}
+.ldm b{display:block;font-size:14px}
+.ldm span{display:block;font-size:12px;color:var(--soft)}
+.ldm .ldo{color:var(--danger)}
+.ldm .ldp{color:var(--accent);font-weight:700}
+.lda{display:flex;flex-direction:column;gap:6px;flex:none}
+.ld-cli{background:var(--accent-bg);border:1px solid var(--gold);border-radius:12px;padding:10px;margin-top:6px}
+.ld-desc b{color:var(--soft);text-decoration:line-through}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -243,7 +261,7 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
   <header><div class="h-row"><button class="hb" data-back>‹ Tarifa</button><h1>Visitas<small id="visSub"></small></h1><button class="hb" id="vExp">Exportar Excel</button></div></header>
   <div class="pane">
     <div class="wk"><button id="wPrev" aria-label="Semana anterior">‹</button><b id="wLbl"></b><button id="wNext" aria-label="Semana siguiente">›</button></div>
-    <div class="seg" id="vSeg"><button data-s="inf">Informe semanal</button><button data-s="plan">Plan semana siguiente</button><button data-s="cmp">Plan vs realizado</button></div>
+    <div class="seg" id="vSeg"><button data-s="inf">Informe semanal</button><button data-s="plan">Plan semana siguiente</button><button data-s="cmp">Plan vs realizado</button><button data-s="lead">Base de datos</button></div>
     <div class="pane" id="vBody" style="padding:0"></div>
   </div>
 </section>
@@ -266,8 +284,14 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
       <label class="btn full">Importar o actualizar clientes (Excel)<input type="file" id="fC" accept=".xlsx,.xls,.xlsm,.csv" hidden></label>
       <button class="btn del sm" id="delC">Borrar base de clientes</button>
     </div>
-    <p class="note">Tarifas, clientes e historial se guardan solo en este dispositivo.</p>
-  </div>
+    <div class="box">
+      <h2>Copia de seguridad</h2>
+      <p>Guarda en un archivo todo lo de la app (tarifas, clientes, pedidos, visitas y base de datos) para no perderlo si cambias de tablet o desinstalas. Envíatelo por correo o guárdalo en Drive.</p>
+      <button class="btn full" id="bkSave">Guardar copia de seguridad</button>
+      <label class="btn full ghost">Restaurar una copia<input type="file" id="bkLoad" accept=".json,application/json" hidden></label>
+      <div id="bkMsg" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <p class="note">Tarifas, clientes e historial se guardan solo en este dispositivo.</p>  </div>
 </section>
 
 </div>
@@ -589,6 +613,7 @@ function saveOrder(silent) {
   if (i >= 0) H[i] = o; else H.push(o);
   S.orderId = o.id; saveS();
   if (saveH() && !silent) toast(i >= 0 ? 'Pedido actualizado en el historial' : 'Pedido guardado en el historial');
+  leadConv(o.cli);
   renderCliH();
 }
 function renderHist() {
@@ -763,14 +788,17 @@ function syncOrders(k) {
     (g[key] = g[key] || {d, cli: o.cli, tel: o.tel || '', v: 0}).v += +o.total || 0;
   });
   let ch = false;
+  // primer pedido de un lead de la base de datos ese día: cuenta como cliente nuevo captado
+  const first = x => { const l = leadOf(x.cli), t = l ? leadInfo(l).t : 0; return !!t && isoD(new Date(t)) === x.d; };
   w.inf.rows.forEach(r => {
     if (!r.oa) return;
     const x = g[r.d + '|' + cliKey(r.cli)], ped = x ? 'Sí' : 'No', imp = x ? r2(x.v) : null;
     if (r.ped !== ped || r.imp !== imp) { r.ped = ped; r.imp = imp; ch = true; }
+    if (x && !r.nuevo && first(x)) { r.nuevo = true; ch = true; }
   });
   Object.values(g).forEach(x => {
     if (w.inf.rows.some(r => r.d === x.d && cliKey(r.cli) === cliKey(x.cli)) || w.inf.rows.length >= MAXV) return;
-    w.inf.rows.push({id: uid(), d: x.d, cli: x.cli, tel: x.tel || telOf(x.cli), acc: 'Pedido', ped: 'Sí', imp: r2(x.v), prox: '', pot: 'No', del: 'No', nuevo: false, oa: true});
+    w.inf.rows.push({id: uid(), d: x.d, cli: x.cli, tel: x.tel || telOf(x.cli), acc: 'Pedido', ped: 'Sí', imp: r2(x.v), prox: '', pot: 'No', del: 'No', nuevo: first(x), oa: true});
     ch = true;
   });
   if (ch) saveV();
@@ -780,18 +808,45 @@ let visWk = monOf(new Date()), visTab = 'inf', VF = null;
 const kpiV = (t, v, sub, main) => `<div class="kpi${main ? ' main' : ''}"><span>${esc(t)}</span><b>${v}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 const fldV = (lbl, k, val, type, extra) => `<div class="field"><label>${esc(lbl)}</label><input data-k="${k}" type="${type || 'text'}" value="${esc(val)}" autocomplete="off"${extra || ''}></div>`;
 const txtV = (lbl, k, val) => `<div class="field"><label>${esc(lbl)}</label><textarea data-k="${k}">${esc(val)}</textarea></div>`;
+const MAPS_MAX = 10; // paradas por enlace de Google Maps
+const cleanP = s => String(s || '').replace(/^[\s,]+|[\s,]+$/g, '');
+const stopOf = r => [r.addr ? cleanP(r.addr) : cleanP(r.cli), cleanP(r.dir)].filter(Boolean).join(', ');
+function mapsBtns(d, rows) {
+  const n = rows.length; if (!n) return '';
+  const parts = Math.max(1, Math.ceil((n - 1) / (MAPS_MAX - 1)));
+  return Array.from({length: parts}, (_, i) => `<button class="mbtn" data-map="${d}|${i}">${parts > 1 ? 'Ruta ' + (i + 1) : 'Ruta en Maps'}</button>`).join('');
+}
+function openMaps(d, part) {
+  const rows = sortR(wk(addD(visWk, 7)).plan.rows.filter(r => r.d === d)).map(stopOf);
+  const a = part * (MAPS_MAX - 1), seg = rows.slice(a, a + MAPS_MAX);
+  if (!seg.length) return;
+  const e = encodeURIComponent;
+  let url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving';
+  if (part > 0) { url += '&origin=' + e(seg[0]); seg.shift(); }
+  if (!seg.length) return;
+  url +='&destination=' + e(seg[seg.length - 1]);
+  if (seg.length > 1) url += '&waypoints=' + e(seg.slice(0, -1).join('|'));
+  openExt(url);
+}
+function openExt(url) { if (NATIVE) location.href = url; else window.open(url, '_blank'); }
+const waNum = t => { const d = String(t || '').replace(/\D/g, ''); return d.length === 9 ? '34' + d : d; };
 function rowsV(rows, kind) {
   if (!rows.length) return `<p>${kind === 'inf' ? 'Aún no hay visitas en esta semana.' : 'Aún no hay visitas planificadas.'}</p>`;
   let last = '', h = '';
-  sortR(rows).forEach(r => {
-    if (r.d !== last) { last = r.d; h += `<div class="vd">${esc(dayLbl(r.d))}</div>`; }
+  const sorted = sortR(rows);
+  sorted.forEach(r => {
+    if (r.d !== last) {
+      last = r.d;
+      h += `<div class="vd"><span>${esc(dayLbl(r.d))}</span>${kind === 'plan' ? mapsBtns(r.d, sorted.filter(x => x.d === r.d)) : ''}</div>`;
+    }
+    const star = isNewCli(r.cli) ? '<span class="vstar">★ Nuevo cliente</span>' : '';
     if (kind === 'inf') {
       const t = [r.acc, r.prox && 'Próximo: ' + r.prox].filter(Boolean).join(' · ');
       const f = [r.nuevo && 'Cliente nuevo', r.pot === 'Sí' && 'Potencial', r.del === 'Sí' && 'Con delegado'].filter(Boolean).join(' · ');
-      h += `<button class="vr" data-ri="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${t ? `<span>${esc(t)}</span>` : ''}${f ? `<span class="vf">${esc(f)}</span>` : ''}</div><strong>${r.ped === 'Sí' ? eur(+r.imp || 0) : '<small>Sin pedido</small>'}</strong></button>`;
+      h += `<button class="vr${star ? ' vnew' : ''}" data-ri="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${star}${t ? `<span>${esc(t)}</span>` : ''}${f ? `<span class="vf">${esc(f)}</span>` : ''}</div><strong>${r.ped === 'Sí' ? eur(+r.imp || 0) : '<small>Sin pedido</small>'}</strong></button>`;
     } else {
-      const t = [r.hora, r.tipo, r.prio && 'Prioridad ' + r.prio.toLowerCase()].filter(Boolean).join(' · ');
-      h += `<button class="vr" data-rp="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${t ? `<span>${esc(t)}</span>` : ''}${r.obj ? `<span>${esc(r.obj)}</span>` : ''}</div><strong>›</strong></button>`;
+      const t = [r.hora, r.tipo, r.prio && 'Prioridad ' + r.prio.toLowerCase(), r.dir].filter(Boolean).join(' · ');
+      h += `<button class="vr${star ? ' vnew' : ''}" data-rp="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${star}${t ? `<span>${esc(t)}</span>` : ''}${r.obj ? `<span>${esc(r.obj)}</span>` : ''}</div><strong>›</strong></button>`;
     }
   });
   return h;
@@ -820,11 +875,31 @@ function renderVis() {
     h = `<p class="vnote">Planificas la semana del <b>${dmy(nk)}</b> al <b>${dmy(addD(nk, 6))}</b>. Cuando llegue esa semana, este plan se compara con lo realizado.</p>
     <div class="kpis">${kpiV('Visitas previstas', sp.n, 'máximo ' + MAXV, true)}${kpiV('Nuevos', sp.nue, 'a prospectar')}${kpiV('Seguimiento', sp.seg)}${kpiV('Cobro / entrega', sp.cob)}${kpiV('Incidencias', sp.inc, 'a resolver')}${kpiV('Km', num(sp.km), 'estimados')}</div>
     <div class="box"><div class="bh"><h2>Visitas planificadas</h2><span class="meta">${sp.n} / ${MAXV}</span></div>
+    ${planMsg ? `<div class="msg">${esc(planMsg)}</div>` : ''}
     ${rowsV(pl.rows, 'plan')}
-    <button class="btn full${sp.n >= MAXV ? ' off' : ''}" data-v="addPlan">+ Añadir visita planificada</button></div>
+    <button class="btn full${sp.n >= MAXV ? ' off' : ''}" data-v="addPlan">+ Añadir visita planificada</button>
+    <div class="row"><label class="btn ghost">Importar plan (Excel)<input type="file" id="fP" accept=".xlsx,.xls,.xlsm,.csv" hidden></label><button class="btn ghost" data-v="fromLeads">Desde base de datos</button></div>
+    <p>Importa tu Excel de plan (hoja «Plan Semana Siguiente») o el de rutas (una hoja por día). Cada visita va a la semana de su fecha y no se duplican.</p>
+    ${sp.n ? '<button class="btn del sm" data-v="clrPlan">Vaciar el plan de esta semana</button>' : ''}</div>
     <div class="box"><h2>Datos del plan</h2>${txtV('Objetivo principal de la semana', 'plan.obj', pl.obj)}
     <div class="grid2">${fldV('Km estimados', 'plan.km', pl.km, 'text', ' inputmode="decimal"')}${fldV('Fecha entrega del plan', 'plan.ent', pl.ent, 'date')}</div>
     ${txtV('Comentarios del delegado / ajustes al plan', 'plan.com', pl.com)}</div>`;
+  } else if (visTab === 'lead') {
+    const st = {act: 0, cli: 0, desc: 0};
+    LD.forEach(l => st[leadInfo(l).s]++);
+    const locs = [...new Set(LD.map(l => l.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    const days = [0, 1, 2, 3, 4, 5, 6].map(i => addD(nk, i));
+    h = `<div class="kpis">${kpiV('Leads activos', st.act, 'por visitar', true)}${kpiV('Ya clientes', st.cli, 'con pedido')}${kpiV('Descartados', st.desc, 'no sirven')}</div>
+    <div class="box"><div class="bh"><h2>Base de datos de clientes potenciales</h2><span class="meta">${LD.length}</span></div>
+    <p>Importa tu Excel de base de datos (Tipo de negocio, Cliente, Dirección, Localidad). Si lo vuelves a importar se añaden los nuevos y se respeta lo que ya marcaste. Un lead pasa a cliente solo cuando guardas su primer pedido.</p>
+    <label class="btn full ghost">Importar base de datos (Excel)<input type="file" id="fL" accept=".xlsx,.xls,.xlsm,.csv" hidden></label>
+    ${ldMsg ? `<div class="msg">${esc(ldMsg)}</div>` : ''}</div>
+    ${LD.length ? `<div class="box"><div class="field"><input id="lQ" type="search" placeholder="Buscar nombre, negocio, localidad…" value="${esc(ldQ)}" autocomplete="off"></div>
+    <div class="grid2"><div class="field"><select id="lF">${[['act', 'Leads activos'], ['cli', 'Ya clientes'], ['desc', 'Descartados'], ['all', 'Todos']].map(([v, t]) => `<option value="${v}"${v === ldF ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><select id="lLoc"><option value="">Todas las localidades</option>${locs.map(x => `<option${x === ldLoc ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></div></div>
+    <div id="lList"></div></div>
+    <div class="box"><h2>Añadir al plan de la semana siguiente</h2><p>Marca en la lista los que quieras visitar y elige el día (semana ${esc(wkLbl(nk))}).</p>
+    <div class="grid2"><div class="field"><select id="lDay">${days.map(d => `<option value="${d}">${esc(DIAS_L[dow(d)] + ' ' + dmy(d))}</option>`).join('')}</select></div><button class="btn" data-v="lAdd" id="lAddB">Añadir al plan</button></div></div>` : ''}`;
   } else {
     const pl = w.plan, sp = planSt(pl), vis = pl.rows.filter(p => visited(p, inf)).length;
     const pc = (a, b) => a > 0 ? Math.round(b / a * 100) + ' %' : '—';
@@ -840,26 +915,53 @@ function renderVis() {
       : '<p>No hay plan para esta semana. Se prepara en «Plan semana siguiente» durante la semana anterior.</p>'}</div>`;
   }
   $('vBody').innerHTML = h;
+  if (visTab === 'lead' && LD.length) renderLeads();
 }
 function setVK(k, v) {
   const [a, b] = k.split('.');
   if (!b) V[a] = v; else (a === 'plan' ? wk(addD(visWk, 7)).plan : wk(visWk).inf)[b] = v;
   saveV();
 }
-$('vBody').addEventListener('input', e => { const el = e.target.closest('[data-k]'); if (el) setVK(el.dataset.k, el.value); });
-$('vBody').addEventListener('change', e => {
+$('vBody').addEventListener('input', e => {
+  if (e.target.id === 'lQ') { ldQ = e.target.value; renderLeads(); return; }
+  const el = e.target.closest('[data-k]'); if (el) setVK(el.dataset.k, el.value);
+});
+$('vBody').addEventListener('change', async e => {
+  const id = e.target.id;
+  if (id === 'lF') { ldF = e.target.value; renderLeads(); return; }
+  if (id === 'lLoc') { ldLoc = e.target.value; renderLeads(); return; }
+  if (e.target.dataset.ls) { if (e.target.checked) ldSel.add(e.target.dataset.ls); else ldSel.delete(e.target.dataset.ls); updLAdd(); return; }
+  if (id === 'fP' || id === 'fL') {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let book;
+    try { book = await readBook(f); } catch (err) { toast('No se ha podido leer el Excel: ' + err.message); return; }
+    if (id === 'fP') importPlanFile(book, f.name); else importLeads(book, f.name);
+    return;
+  }
   const el = e.target.closest('[data-k]'); if (!el) return;
   if (/km|noLoc|incid/.test(el.dataset.k)) renderVis();
 });
+let clrArm = false;
 $('vBody').addEventListener('click', e => {
+  const mb = e.target.closest('[data-map]');
+  if (mb) { const [d, p] = mb.dataset.map.split('|'); openMaps(d, +p); return; }
+  const la = e.target.closest('[data-la]');
+  if (la) { leadAct(la.dataset.la, la.dataset.id); return; }
   const b = e.target.closest('[data-v],[data-ri],[data-rp],[data-pv]'); if (!b) return;
-  if (b.dataset.v) { openVis(b.dataset.v === 'addInf' ? 'inf' : 'plan'); return; }
+  const v = b.dataset.v;
+  if (v === 'fromLeads') { visTab = 'lead'; ldF = 'act'; renderVis(); window.scrollTo(0, 0); return; }
+  if (v === 'lAdd') { addLeadsToPlan(); return; }
+  if (v === 'clrPlan') {
+    if (!clrArm) { clrArm = true; b.textContent = '¿Seguro? Pulsa otra vez para vaciarlo'; setTimeout(() => { clrArm = false; if (b.isConnected) b.textContent = 'Vaciar el plan de esta semana'; }, 3000); return; }
+    clrArm = false; wk(addD(visWk, 7)).plan.rows = []; planMsg = ''; saveV(); renderVis(); toast('Plan vaciado'); return;
+  }
+  if (v) { openVis(v === 'addInf' ? 'inf' : 'plan'); return; }
   if (b.dataset.ri) { const r = wk(visWk).inf.rows.find(x => x.id === b.dataset.ri); if (r) openVis('inf', r); return; }
   if (b.dataset.rp) { const r = wk(addD(visWk, 7)).plan.rows.find(x => x.id === b.dataset.rp); if (r) openVis('plan', r); return; }
   const p = wk(visWk).plan.rows.find(x => x.id === b.dataset.pv); if (!p) return;
   openVis('inf', null, {d: p.d, cli: p.cli, tel: telOf(p.cli), acc: p.tipo === 'Nuevo cliente' ? 'Prospección' : p.tipo || '', nuevo: p.tipo === 'Nuevo cliente' && !inCL(p.cli)});
 });
-$('vSeg').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; visTab = b.dataset.s; renderVis(); window.scrollTo(0, 0); });
+$('vSeg').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; visTab = b.dataset.s; planMsg = ''; ldMsg = ''; renderVis(); window.scrollTo(0, 0); });
 $('wPrev').addEventListener('click', () => { visWk = addD(visWk, -7); renderVis(); });
 $('wNext').addEventListener('click', () => { visWk = addD(visWk, 7); renderVis(); });
 
@@ -871,13 +973,14 @@ function openVis(kind, row, pre) {
   const today = isoD(new Date()), d0 = today >= k && today <= addD(k, 6) ? today : k;
   const r = Object.assign(kind === 'inf'
     ? {d: d0, cli: '', tel: '', acc: '', ped: 'No', imp: null, prox: '', pot: 'No', del: 'No', nuevo: false, oa: true}
-    : {d: d0, cli: '', dir: '', hora: '', obj: '', tipo: 'Seguimiento', prio: 'Media', obs: ''}, row || {}, pre || {});
+    : {d: d0, cli: '', dir: '', addr: '', hora: '', obj: '', tipo: 'Seguimiento', prio: 'Media', obs: ''}, row || {}, pre || {});
   VF = {kind, k, list, row, r, ped0: r.ped, imp0: r.imp, nTouched: !!row, del: false};
   const sel = (id, opts, v) => `<select id="${id}">${opts.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => addD(k, i));
   let h = `<h2>${row ? 'Modificar visita' : kind === 'inf' ? 'Nueva visita' : 'Nueva visita planificada'}</h2><p>Semana ${esc(wkLbl(k))}</p>
     <div class="field"><label for="vfD">Día</label><select id="vfD">${days.map(d => `<option value="${d}"${d === r.d ? ' selected' : ''}>${esc(DIAS_L[dow(d)] + ' ' + dmy(d))}</option>`).join('')}</select></div>
-    <div class="field"><label for="vfC">Cliente</label><input id="vfC" value="${esc(r.cli)}" placeholder="Escribe para buscar en la base de clientes" autocomplete="off"><div class="sug" id="vfS" hidden></div></div>`;
+    <div class="field"><label for="vfC">Cliente</label><input id="vfC" value="${esc(r.cli)}" placeholder="Escribe para buscar en clientes y base de datos" autocomplete="off"><div class="sug" id="vfS" hidden></div></div>
+    <div class="ct" id="vfCt"></div>`;
   if (kind === 'inf') h += `
     <label class="chk"><input type="checkbox" id="vfN"${r.nuevo ? ' checked' : ''}> Cliente nuevo (se guarda también en la base de clientes)</label>
     <div class="field"><label for="vfT">Teléfono</label><input id="vfT" type="tel" inputmode="tel" value="${esc(r.tel)}" autocomplete="off"></div>
@@ -887,26 +990,41 @@ function openVis(kind, row, pre) {
     <div class="grid2"><div class="field"><label for="vfO">Potencial</label>${sel('vfO', ['No', 'Sí'], r.pot)}</div><div class="field"><label for="vfL">Visita con delegado</label>${sel('vfL', ['No', 'Sí'], r.del)}</div></div>
     ${r.oa ? '<p>«¿Pedido?» e importe se rellenan solos con los pedidos guardados ese día para este cliente. Si los cambias a mano, se queda lo que escribas.</p>' : ''}`;
   else h += `
-    <div class="field"><label for="vfR">Dirección / zona</label><input id="vfR" value="${esc(r.dir)}" autocomplete="off"></div>
+    <div class="grid2"><div class="field"><label for="vfR">Localidad / zona</label><input id="vfR" value="${esc(r.dir)}" autocomplete="off"></div><div class="field"><label for="vfAd">Dirección (para Maps)</label><input id="vfAd" value="${esc(r.addr || '')}" autocomplete="off"></div></div>
     <div class="grid2"><div class="field"><label for="vfH">Hora prevista</label><input id="vfH" type="time" value="${esc(r.hora)}"></div><div class="field"><label for="vfY">Prioridad</label>${sel('vfY', PRIOS, r.prio)}</div></div>
     <div class="field"><label for="vfTi">Tipo de visita</label>${sel('vfTi', TIPOS, r.tipo)}</div>
     <div class="field"><label for="vfB">Objetivo de la visita</label><input id="vfB" value="${esc(r.obj)}" autocomplete="off"></div>
     <div class="field"><label for="vfZ">Observaciones / material necesario</label><textarea id="vfZ">${esc(r.obs)}</textarea></div>`;
   h += `<div class="row"><button class="btn ghost" id="vfCan">Cancelar</button><button class="btn" id="vfOk">Guardar</button></div>${row ? '<button class="btn del sm" id="vfDel">Borrar visita</button>' : ''}`;
   $('vForm').innerHTML = h; $('vov').hidden = false;
+  updCt();
+}
+// botones de llamar, WhatsApp y Maps según el cliente del formulario
+function updCt() {
+  if (!VF) return;
+  const cli = $('vfC').value.trim(), tel = VF.kind === 'inf' ? $('vfT').value.trim() || telOf(cli) : telOf(cli);
+  const l = leadOf(cli), dest = VF.kind === 'plan' ? (cli || $('vfAd').value.trim() ? stopOf({cli, addr: $('vfAd').value, dir: $('vfR').value}) : '') : (l ? stopOf({cli: l.n, addr: l.dir, dir: l.loc}) : '');
+  VF.ct = {tel, dest};
+  $('vfCt').innerHTML = (tel ? `<button type="button" class="btn ghost sm" data-ct="tel">Llamar</button><button type="button" class="btn ghost sm" data-ct="wa">WhatsApp</button>` : '')
+    + (dest ? `<button type="button" class="btn ghost sm" data-ct="map">Cómo llegar</button>` : '');
+}
+// clientes de la base + leads que aún no son clientes
+function cliPool() {
+  const pool = CL.map(c => ({n: c.n, t: c.t, l: c.l, c: c.c, h: c.h || (c.h = norm([c.n, c.c, c.l].join(' ')))}));
+  const have = new Set(pool.map(p => cliKey(p.n)));
+  LD.forEach(l => { if (l.st !== 'desc' && !have.has(cliKey(l.n))) pool.push({n: l.n, l: l.loc, a: l.dir, lead: true, h: norm([l.n, l.loc, l.neg].join(' '))}); });
+  return pool;
 }
 const closeVis = () => { $('vov').hidden = true; VF = null; };
 function sugVis() {
   const words = norm($('vfC').value).split(/\s+/).filter(Boolean), s = $('vfS');
-  if (VF.kind === 'inf' && !VF.nTouched) $('vfN').checked = !!words.length && !inCL($('vfC').value);
-  if (!words.length || !CL.length) { s.hidden = true; return; }
+  if (VF.kind === 'inf' && !VF.nTouched) $('vfN').checked = !!words.length && !inCL($('vfC').value) && !leadOf($('vfC').value);
+  const pool = VF.pool || (VF.pool = cliPool());
+  if (!words.length || !pool.length) { s.hidden = true; return; }
   const res = [];
-  for (let i = 0; i < CL.length && res.length < 8; i++) {
-    const c = CL[i], hay = c.h || (c.h = norm([c.n, c.c, c.l].join(' ')));
-    if (words.every(w => hay.includes(w))) res.push(i);
-  }
-  if (!res.length || (res.length === 1 && CL[res[0]].n === $('vfC').value)) { s.hidden = true; return; }
-  s.innerHTML = res.map(i => { const c = CL[i]; return `<button type="button" data-i="${i}"><b>${esc(c.n)}</b><span>${esc([c.c, c.l, c.t].filter(Boolean).join(' · '))}</span></button>`; }).join('');
+  for (let i = 0; i < pool.length && res.length < 8; i++) if (words.every(w => pool[i].h.includes(w))) res.push(i);
+  if (!res.length || (res.length === 1 && pool[res[0]].n === $('vfC').value)) { s.hidden = true; return; }
+  s.innerHTML = res.map(i => { const c = pool[i]; return `<button type="button" data-i="${i}"><b>${esc(c.n)}${c.lead ? ' <span class="tag">lead</span>' : ''}</b><span>${esc([c.c, c.l, c.t].filter(Boolean).join(' · '))}</span></button>`; }).join('');
   s.hidden = false;
 }
 function saveVis() {
@@ -924,18 +1042,34 @@ function saveVis() {
       CL.push(c); CL.sort((a, b) => a.n.localeCompare(b.n, 'es')); saveC();
       toast('Cliente nuevo añadido a la base de clientes');
     }
-  } else Object.assign(r, {dir: g('vfR'), hora: g('vfH'), prio: $('vfY').value, tipo: $('vfTi').value, obj: g('vfB'), obs: g('vfZ')});
+  } else Object.assign(r, {dir: g('vfR'), addr: g('vfAd'), hora: g('vfH'), prio: $('vfY').value, tipo: $('vfTi').value, obj: g('vfB'), obs: g('vfZ')});
   if (VF.row) Object.assign(VF.row, r); else { r.id = uid(); VF.list.push(r); }
   saveV(); closeVis(); renderVis();
 }
-$('vForm').addEventListener('input', e => { if (e.target.id === 'vfC') sugVis(); });
+$('vForm').addEventListener('input', e => {
+  if (e.target.id === 'vfC') sugVis();
+  if (['vfC', 'vfT', 'vfR', 'vfAd'].includes(e.target.id)) updCt();
+});
 $('vForm').addEventListener('change', e => { if (e.target.id === 'vfN' && VF) VF.nTouched = true; });
 $('vForm').addEventListener('click', e => {
   const sb = e.target.closest('#vfS button');
   if (sb) {
-    const c = CL[+sb.dataset.i]; $('vfC').value = c.n; $('vfS').hidden = true;
+    const c = VF.pool[+sb.dataset.i]; $('vfC').value = c.n; $('vfS').hidden = true;
     if (VF.kind === 'inf') { if (c.t && !$('vfT').value) $('vfT').value = c.t; if (!VF.nTouched) $('vfN').checked = false; }
-    else if (!$('vfR').value) $('vfR').value = c.l || '';
+    else {
+      if (!$('vfR').value) $('vfR').value = c.l || '';
+      if (!$('vfAd').value) $('vfAd').value = c.a || (leadOf(c.n) || {}).dir || '';
+      if (c.lead && !VF.row) $('vfTi').value = 'Prospección';
+    }
+    updCt();
+    return;
+  }
+  const ct = e.target.closest('[data-ct]');
+  if (ct && VF.ct) {
+    const a = ct.dataset.ct;
+    if (a === 'tel') openExt('tel:' + VF.ct.tel.replace(/[^\d+]/g, ''));
+    else if (a === 'wa') openExt('https://wa.me/' + waNum(VF.ct.tel));
+    else openExt('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(VF.ct.dest));
     return;
   }
   const id = e.target.id;
@@ -948,6 +1082,210 @@ $('vForm').addEventListener('click', e => {
   }
 });
 $('vov').addEventListener('click', e => { if (e.target === $('vov')) closeVis(); });
+
+// ----- base de datos de leads: importar, descartar y convertir en clientes -----
+const LK = 'tp2-leads';
+let LD = load(LK, null); if (!Array.isArray(LD)) LD = [];
+const saveL = () => store(LK, LD);
+let ldF = 'act', ldQ = '', ldLoc = '', ldSel = new Set(), ldMsg = '', planMsg = '';
+const leadOf = name => { const k = cliKey(name); return LD.find(l => cliKey(l.n) === k); };
+// fecha del primer pedido guardado para ese nombre (después de la última baja, si la hubo)
+function firstOrd(name, after) { const k = cliKey(name); let t = 0; H.forEach(o => { if (o.ts > (after || 0) && cliKey(o.cli) === k && (!t || o.ts < t)) t = o.ts; }); return t; }
+function leadInfo(l) {
+  const t = firstOrd(l.n, l.baja);
+  if (t) return {s: 'cli', t};
+  if (l.cliMan) return {s: 'cli', t: 0};
+  return {s: l.st === 'desc' ? 'desc' : 'act'};
+}
+const isNewCli = name => { const l = leadOf(name); return !!l && leadInfo(l).s === 'cli'; };
+function addToCL(n, loc) { if (inCL(n)) return; const c = {n}; if (loc) c.l = loc; CL.push(c); CL.sort((a, b) => a.n.localeCompare(b.n, 'es')); saveC(); }
+// al guardar un pedido: si es el primero de un lead, se avisa y pasa a la base de clientes
+function leadConv(name) {
+  const l = leadOf(name); if (!l || l.notified) return;
+  const x = leadInfo(l); if (x.s !== 'cli' || !x.t) return;
+  l.notified = true; l.st = 'act'; saveL(); addToCL(l.n, l.loc);
+  setTimeout(() => toast('★ ' + l.n + ' ya es cliente: primer pedido'), 2800);
+}
+function leadRow(l) {
+  const x = leadInfo(l), sel = ldSel.has(l.id);
+  const inPlan = wk(addD(visWk, 7)).plan.rows.find(r => cliKey(r.cli) === cliKey(l.n));
+  const badge = x.s === 'cli' ? `<span class="ldb">★ Cliente${x.t ? ' desde el ' + fdate(x.t) + ' (primer pedido)' : ' (marcado a mano)'}</span>`
+    : l.baja ? `<span class="ldo">Dejó de comprar el ${fdate(l.baja)}</span>` : '';
+  const acts = x.s === 'cli' ? `<button class="btn ghost sm" data-la="baja" data-id="${esc(l.id)}">Ya no compra</button>`
+    : x.s === 'desc' ? `<button class="btn ghost sm" data-la="rec" data-id="${esc(l.id)}">Recuperar</button>`
+    : `<button class="btn ghost sm" data-la="cli" data-id="${esc(l.id)}">Es cliente</button><button class="btn del sm" data-la="desc" data-id="${esc(l.id)}">Descartar</button>`;
+  return `<div class="ld ld-${x.s}"><input type="checkbox" data-ls="${esc(l.id)}"${sel ? ' checked' : ''} aria-label="Elegir ${esc(l.n)}"><div class="ldm"><b>${esc(l.n)}</b>`
+    + `<span>${esc([l.neg, l.loc].filter(Boolean).join(' · '))}</span>${l.dir ? `<span>${esc(l.dir)}</span>` : ''}${badge}`
+    + `${inPlan ? `<span class="ldp">En el plan: ${esc(dayLbl(inPlan.d))}</span>` : ''}</div><div class="lda">${acts}</div></div>`;
+}
+function renderLeads() {
+  const el = $('lList'); if (!el) return;
+  const words = norm(ldQ).split(/\s+/).filter(Boolean);
+  const list = LD.filter(l => { const s = leadInfo(l).s; return (ldF === 'all' || s === ldF) && (!ldLoc || l.loc === ldLoc) && words.every(w => norm([l.n, l.neg, l.loc, l.dir].join(' ')).includes(w)); })
+    .sort((a, b) => (a.loc || '').localeCompare(b.loc || '', 'es') || a.n.localeCompare(b.n, 'es'));
+  el.innerHTML = list.length ? `<p>${list.length} ${list.length === 1 ? 'resultado' : 'resultados'}</p>` + list.map(leadRow).join('') : '<p>Ninguno con este filtro.</p>';
+  updLAdd();
+}
+function updLAdd() { const b = $('lAddB'); if (b) { b.textContent = ldSel.size ? `Añadir ${ldSel.size} al plan` : 'Añadir al plan'; b.classList.toggle('off', !ldSel.size); } }
+function leadAct(a, id) {
+  const l = LD.find(x => x.id === id); if (!l) return;
+  if (a === 'desc') { l.st = 'desc'; ldSel.delete(id); toast('Descartado: ' + l.n); }
+  else if (a === 'rec') { l.st = 'act'; toast('Recuperado: ' + l.n); }
+  else if (a === 'cli') { l.cliMan = true; l.st = 'act'; addToCL(l.n, l.loc); toast(l.n + ' marcado como cliente'); }
+  else if (a === 'baja') { l.baja = Date.now(); l.cliMan = false; l.notified = false; toast(l.n + ' vuelve a ser lead'); }
+  saveL(); renderVis();
+}
+function addLeadsToPlan() {
+  if (!ldSel.size) { toast('Marca primero algún lead de la lista'); return; }
+  const d = $('lDay').value, pl = wk(monOf(pD(d))).plan;
+  let n = 0, dup = 0, full = 0;
+  LD.filter(l => ldSel.has(l.id)).forEach(l => {
+    if (pl.rows.some(r => r.d === d && cliKey(r.cli) === cliKey(l.n))) { dup++; return; }
+    if (pl.rows.length >= MAXV) { full++; return; }
+    const cli = leadInfo(l).s === 'cli';
+    pl.rows.push({id: uid(), d, cli: l.n, dir: l.loc || '', addr: l.dir || '', hora: '', obj: cli ? 'Visita de seguimiento' : 'Visita prospección potencial', tipo: cli ? 'Seguimiento' : 'Prospección', prio: 'Media', obs: '', neg: l.neg || ''});
+    n++;
+  });
+  saveV(); ldSel.clear();
+  planMsg = `${n} ${n === 1 ? 'visita añadida' : 'visitas añadidas'} el ${dayLbl(d)}` + (dup ? `; ${dup} ya estaban ese día` : '') + (full ? `; ${full} no caben (máximo ${MAXV})` : '') + '.';
+  visTab = 'plan'; renderVis(); window.scrollTo(0, 0);
+}
+function hdrIdx(rows, test) {
+  for (let r = 0; r < Math.min(rows.length, 25); r++) { const h = (rows[r] || []).map(x => norm(x)); const k = test(h); if (k) return [r, k]; }
+  return [-1, null];
+}
+function importLeads(book, fname) {
+  let use = book.filter(s => /base/i.test(s.name)); if (!use.length) use = book;
+  const seen = new Set(LD.map(l => cliKey(l.n))); let add = 0, upd = 0, tot = 0;
+  use.forEach(s => {
+    const [hi, c] = hdrIdx(s.rows, h => {
+      const k = {}; h.forEach((x, i) => {
+        if (!x) return;
+        if (k.n == null && /^(cliente|nombre|razon social|empresa)/.test(x)) k.n = i;
+        else if (k.neg == null && /negocio|actividad|^tipo$/.test(x)) k.neg = i;
+        else if (k.loc == null && /localidad|poblacion|municipio|ciudad/.test(x)) k.loc = i;
+        else if (k.dir == null && /^direccion|^domicilio/.test(x)) k.dir = i;
+      });
+      return k.n != null && (k.loc != null || k.dir != null) ? k : null;
+    });
+    if (hi < 0) return;
+    const cell = (row, i) => i != null && row[i] != null ? String(row[i]).trim() : '';
+    for (let r = hi + 1; r < s.rows.length; r++) {
+      const row = s.rows[r] || [], n = cell(row, c.n).replace(/\s+/g, ' ');
+      if (!n || n.startsWith('#')) continue;
+      tot++;
+      const it = {neg: cell(row, c.neg), loc: cell(row, c.loc), dir: cell(row, c.dir)}, k = cliKey(n);
+      if (seen.has(k)) { const l = LD.find(x => cliKey(x.n) === k); if (l) { let u = false; ['neg', 'loc', 'dir'].forEach(f => { if (!l[f] && it[f]) { l[f] = it[f]; u = true; } }); if (u) upd++; } continue; }
+      seen.add(k); LD.push(Object.assign({id: uid(), n, st: 'act', add: Date.now()}, it)); add++;
+    }
+  });
+  if (!tot) { ldMsg = `✕ ${fname}: no encuentro las columnas Cliente y Localidad o Dirección.`; renderVis(); return; }
+  saveL();
+  ldMsg = `✓ ${fname}: ${add} nuevos en la base de datos` + (upd ? `, ${upd} completados` : '') + (tot - add - upd > 0 ? `, ${tot - add - upd} ya estaban` : '') + '.';
+  renderVis();
+}
+const serD = v => { const d = new Date(Math.round((v - 25569) * 864e5)); return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()); };
+function cellDate(v) {
+  if (typeof v === 'number' && v > 30000 && v < 80000) return serD(v);
+  const m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/.exec(String(v || '').trim());
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return isoD(new Date(y, m[2] - 1, +m[1])); }
+  return null;
+}
+function cellTime(v) {
+  if (typeof v === 'number' && v >= 0 && v < 1) { const t = Math.round(v * 1440); return p2(Math.floor(t / 60) % 24) + ':' + p2(t % 60); }
+  const m = /(\d{1,2})[:.h](\d{2})/.exec(String(v || '')); return m ? p2(+m[1]) + ':' + m[2] : '';
+}
+function importPlanFile(book, fname) {
+  let use = book.filter(s => /^plan/i.test(s.name.trim())); if (!use.length) use = book;
+  const got = [], noDate = [];
+  use.forEach(s => {
+    const [hi, c] = hdrIdx(s.rows, h => {
+      const k = {}; h.forEach((x, i) => {
+        if (!x) return;
+        if (k.cli == null && /^cliente/.test(x)) k.cli = i;
+        else if (k.dia == null && /^(dia|fecha)$/.test(x)) k.dia = i;
+        else if (k.loc == null && /localidad|poblacion|municipio|zona/.test(x)) k.loc = i;
+        else if (k.addr == null && /^direccion/.test(x)) k.addr = i;
+        else if (k.hora == null && /hora|llegada/.test(x)) k.hora = i;
+        else if (k.obj == null && /objetivo/.test(x)) k.obj = i;
+        else if (k.tipo == null && /tipo de visita/.test(x)) k.tipo = i;
+        else if (k.neg == null && /negocio/.test(x)) k.neg = i;
+        else if (k.prio == null && /prioridad/.test(x)) k.prio = i;
+        else if (k.obs == null && /observ/.test(x)) k.obs = i;
+      });
+      return k.cli != null ? k : null;
+    });
+    if (hi < 0) return;
+    // fecha de la hoja: del nombre (17_11_26) o de una celda con fecha encima de la cabecera
+    let sd = null;
+    const m = /(\d{1,2})[_\-. ](\d{1,2})[_\-. ](\d{2,4})/.exec(s.name);
+    if (m) { let y = +m[3]; if (y < 100) y += 2000; sd = isoD(new Date(y, m[2] - 1, +m[1])); }
+    for (let r = 0; r < hi && !sd; r++) (s.rows[r] || []).forEach(v => { if (!sd) sd = cellDate(v); });
+    const cell = (row, i) => i != null && row[i] != null ? String(row[i]).trim() : '';
+    let nd = 0;
+    for (let r = hi + 1; r < s.rows.length; r++) {
+      const row = s.rows[r] || [], cli = cell(row, c.cli).replace(/\s+/g, ' ');
+      if (!cli || cli.startsWith('#')) continue;
+      const d = (c.dia != null && cellDate(row[c.dia])) || sd;
+      if (!d) { nd++; continue; }
+      const tipo = TIPOS.find(t => norm(t) === norm(cell(row, c.tipo))) || '', prio = PRIOS.find(t => norm(t) === norm(cell(row, c.prio))) || '';
+      got.push({d, cli, loc: cell(row, c.loc), addr: cell(row, c.addr), hora: c.hora != null ? cellTime(row[c.hora]) : '', obj: cell(row, c.obj), tipo, prio, obs: cell(row, c.obs), neg: cell(row, c.neg)});
+    }
+    if (nd) noDate.push(s.name);
+  });
+  if (!got.length) { planMsg = `✕ ${fname}: no encuentro visitas con cliente y fecha.` + (noDate.length ? ` Hojas sin fecha: ${noDate.join(', ')}.` : ''); renderVis(); return; }
+  const byW = {}; let add = 0, dup = 0, full = 0;
+  got.forEach(x => {
+    const k = monOf(pD(x.d)), pl = wk(k).plan;
+    if (pl.rows.some(r => r.d === x.d && cliKey(r.cli) === cliKey(x.cli))) { dup++; return; }
+    if (pl.rows.length >= MAXV) { full++; return; }
+    const l = leadOf(x.cli), known = inCL(x.cli) || isNewCli(x.cli);
+    pl.rows.push({id: uid(), d: x.d, cli: x.cli, dir: x.loc || (l && l.loc) || '', addr: x.addr || (l && l.dir) || '', hora: x.hora, obj: x.obj,
+      tipo: x.tipo || (known ? 'Seguimiento' : 'Prospección'), prio: x.prio || 'Media', obs: x.obs, neg: x.neg || (l && l.neg) || ''});
+    byW[k] = (byW[k] || 0) + 1; add++;
+  });
+  saveV();
+  const ws = Object.keys(byW).sort();
+  planMsg = `✓ ${fname}: ${add} ${add === 1 ? 'visita importada' : 'visitas importadas'}` + (ws.length ? ' (' + ws.map(k => `semana ${wkLbl(k)}: ${byW[k]}`).join('; ') + ')' : '')
+    + (dup ? `; ${dup} ya estaban` : '') + (full ? `; ${full} no caben (máximo ${MAXV} por semana)` : '') + (noDate.length ? `. Hojas sin fecha (no importadas): ${noDate.join(', ')}` : '') + '.';
+  if (ws.length) visWk = addD(ws[0], -7);
+  visTab = 'plan'; renderVis(); window.scrollTo(0, 0);
+}
+
+// ----- enviar o descargar un archivo generado -----
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+function shareOut(u8, name, mime) {
+  if (NATIVE && NATIVE.shareFile) { NATIVE.shareFile(b64(u8), name, mime); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([u8], {type: mime})); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('Archivo descargado');
+}
+// ----- copia de seguridad de todos los datos de la app -----
+$('bkSave').addEventListener('click', () => {
+  const data = {app: 'tarifa-pedidos', v: 1, fecha: new Date().toISOString(), keys: {}};
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tp2-')) data.keys[k] = localStorage.getItem(k); }
+  shareOut(new TextEncoder().encode(JSON.stringify(data)), 'Copia Tarifa Pedidos ' + dmy(isoD(new Date())).replace(/\//g, '-') + '.json', 'application/json');
+});
+let bkPend = null;
+$('bkLoad').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d || d.app !== 'tarifa-pedidos' || !d.keys || typeof d.keys !== 'object') throw new Error('no es una copia de esta app');
+    bkPend = d;
+    const n = k => { try { const v = JSON.parse(d.keys[k] || 'null'); return Array.isArray(v) ? v.length : 0; } catch (x) { return 0; } };
+    $('bkMsg').innerHTML = `<div class="msg">Copia del ${esc(fdate(Date.parse(d.fecha) || Date.now()))}: ${n('tp2-historial')} pedidos, ${n('tp2-clientes')} clientes, ${n('tp2-leads')} leads.\nAl restaurarla se sustituyen los datos actuales de la app.</div><button class="btn del" id="bkOk">Sí, restaurar esta copia</button>`;
+  } catch (err) { bkPend = null; $('bkMsg').innerHTML = `<div class="msg">✕ ${esc(f.name)}: ${esc(err.message)}</div>`; }
+});
+$('bkMsg').addEventListener('click', e => {
+  if (e.target.id !== 'bkOk' || !bkPend) return;
+  const ks = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tp2-')) ks.push(k); }
+  try { ks.forEach(k => localStorage.removeItem(k)); Object.entries(bkPend.keys).forEach(([k, v]) => { if (k.startsWith('tp2-')) localStorage.setItem(k, v); }); }
+  catch (err) { toast('No se ha podido restaurar: ' + err.message); return; }
+  location.reload();
+});
 
 // ----- Excel con el mismo formato que «Control_Visitas_Comerciales» (100 filas por hoja) -----
 const XSTY = "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?\u003e\r\n\u003cstyleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x14ac x16r2 xr\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:x16r2=\"http://schemas.microsoft.com/office/spreadsheetml/2015/02/main\" xmlns:xr=\"http://schemas.microsoft.com/office/spreadsheetml/2014/revision\"\u003e\u003cnumFmts count=\"2\"\u003e\u003cnumFmt numFmtId=\"164\" formatCode=\"#,##0.00\u0026quot; €\u0026quot;;\\(#,##0.00\u0026quot; €)\u0026quot;;\\-\"/\u003e\u003cnumFmt numFmtId=\"165\" formatCode=\"h:mm;@\"/\u003e\u003c/numFmts\u003e\u003cfonts count=\"9\" x14ac:knownFonts=\"1\"\u003e\u003cfont\u003e\u003csz val=\"11\"/\u003e\u003ccolor theme=\"1\"/\u003e\u003cname val=\"Calibri\"/\u003e\u003cfamily val=\"2\"/\u003e\u003ccharset val=\"1\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"16\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003ccolor rgb=\"FFFFFFFF\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"12\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"8\"/\u003e\u003cname val=\"Calibri\"/\u003e\u003cfamily val=\"2\"/\u003e\u003ccharset val=\"1\"/\u003e\u003c/font\u003e\u003c/fonts\u003e\u003cfills count=\"4\"\u003e\u003cfill\u003e\u003cpatternFill patternType=\"none\"/\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"gray125\"/\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"solid\"\u003e\u003cfgColor rgb=\"FFDCE6F1\"/\u003e\u003cbgColor rgb=\"FFCCFFFF\"/\u003e\u003c/patternFill\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"solid\"\u003e\u003cfgColor rgb=\"FF1F3A5F\"/\u003e\u003cbgColor rgb=\"FF333333\"/\u003e\u003c/patternFill\u003e\u003c/fill\u003e\u003c/fills\u003e\u003cborders count=\"4\"\u003e\u003cborder\u003e\u003cleft/\u003e\u003cright/\u003e\u003ctop/\u003e\u003cbottom/\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/right\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/bottom\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright/\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/bottom\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright/\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom/\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003c/borders\u003e\u003ccellStyleXfs count=\"1\"\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/\u003e\u003c/cellStyleXfs\u003e\u003ccellXfs count=\"26\"\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"2\" fillId=\"2\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"4\" fillId=\"3\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"164\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"164\" fontId=\"6\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"165\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"165\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"5\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"2\" fillId=\"2\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"3\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"7\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"4\" fillId=\"3\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"9\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003c/cellXfs\u003e\u003ccellStyles count=\"1\"\u003e\u003ccellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/\u003e\u003c/cellStyles\u003e\u003cdxfs count=\"0\"/\u003e\u003ctableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium2\" defaultPivotStyle=\"PivotStyleLight16\"/\u003e\u003ccolors\u003e\u003cindexedColors\u003e\u003crgbColor rgb=\"FF000000\"/\u003e\u003crgbColor rgb=\"FFFFFFFF\"/\u003e\u003crgbColor rgb=\"FFFF0000\"/\u003e\u003crgbColor rgb=\"FF00FF00\"/\u003e\u003crgbColor rgb=\"FF0000FF\"/\u003e\u003crgbColor rgb=\"FFFFFF00\"/\u003e\u003crgbColor rgb=\"FFFF00FF\"/\u003e\u003crgbColor rgb=\"FF00FFFF\"/\u003e\u003crgbColor rgb=\"FF800000\"/\u003e\u003crgbColor rgb=\"FF008000\"/\u003e\u003crgbColor rgb=\"FF000080\"/\u003e\u003crgbColor rgb=\"FF808000\"/\u003e\u003crgbColor rgb=\"FF800080\"/\u003e\u003crgbColor rgb=\"FF008080\"/\u003e\u003crgbColor rgb=\"FFBFBFBF\"/\u003e\u003crgbColor rgb=\"FF808080\"/\u003e\u003crgbColor rgb=\"FF9999FF\"/\u003e\u003crgbColor rgb=\"FF993366\"/\u003e\u003crgbColor rgb=\"FFFFFFCC\"/\u003e\u003crgbColor rgb=\"FFDCE6F1\"/\u003e\u003crgbColor rgb=\"FF660066\"/\u003e\u003crgbColor rgb=\"FFFF8080\"/\u003e\u003crgbColor rgb=\"FF0066CC\"/\u003e\u003crgbColor rgb=\"FFCCCCFF\"/\u003e\u003crgbColor rgb=\"FF000080\"/\u003e\u003crgbColor rgb=\"FFFF00FF\"/\u003e\u003crgbColor rgb=\"FFFFFF00\"/\u003e\u003crgbColor rgb=\"FF00FFFF\"/\u003e\u003crgbColor rgb=\"FF800080\"/\u003e\u003crgbColor rgb=\"FF800000\"/\u003e\u003crgbColor rgb=\"FF008080\"/\u003e\u003crgbColor rgb=\"FF0000FF\"/\u003e\u003crgbColor rgb=\"FF00CCFF\"/\u003e\u003crgbColor rgb=\"FFCCFFFF\"/\u003e\u003crgbColor rgb=\"FFCCFFCC\"/\u003e\u003crgbColor rgb=\"FFFFFF99\"/\u003e\u003crgbColor rgb=\"FF99CCFF\"/\u003e\u003crgbColor rgb=\"FFFF99CC\"/\u003e\u003crgbColor rgb=\"FFCC99FF\"/\u003e\u003crgbColor rgb=\"FFFFCC99\"/\u003e\u003crgbColor rgb=\"FF3366FF\"/\u003e\u003crgbColor rgb=\"FF33CCCC\"/\u003e\u003crgbColor rgb=\"FF99CC00\"/\u003e\u003crgbColor rgb=\"FFFFCC00\"/\u003e\u003crgbColor rgb=\"FFFF9900\"/\u003e\u003crgbColor rgb=\"FFFF6600\"/\u003e\u003crgbColor rgb=\"FF666699\"/\u003e\u003crgbColor rgb=\"FF969696\"/\u003e\u003crgbColor rgb=\"FF1F3A5F\"/\u003e\u003crgbColor rgb=\"FF339966\"/\u003e\u003crgbColor rgb=\"FF003300\"/\u003e\u003crgbColor rgb=\"FF333300\"/\u003e\u003crgbColor rgb=\"FF993300\"/\u003e\u003crgbColor rgb=\"FF993366\"/\u003e\u003crgbColor rgb=\"FF333399\"/\u003e\u003crgbColor rgb=\"FF333333\"/\u003e\u003crgbColor rgb=\"00003366\"/\u003e\u003crgbColor rgb=\"00339966\"/\u003e\u003crgbColor rgb=\"00003300\"/\u003e\u003crgbColor rgb=\"00333300\"/\u003e\u003crgbColor rgb=\"00993300\"/\u003e\u003crgbColor rgb=\"00993366\"/\u003e\u003crgbColor rgb=\"00333399\"/\u003e\u003crgbColor rgb=\"00333333\"/\u003e\u003c/indexedColors\u003e\u003c/colors\u003e\u003c/styleSheet\u003e";
@@ -1095,18 +1433,10 @@ function buildVisXlsx(k) {
     ['xl/styles.xml', XSTY], ['xl/theme/theme1.xml', XTHEME]
   ]);
 }
-const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 $('vExp').addEventListener('click', () => {
   let u8;
   try { u8 = buildVisXlsx(visWk); } catch (err) { toast('No se ha podido crear el Excel: ' + err.message); return; }
-  const name = 'Informe visitas ' + dmy(visWk).replace(/\//g, '-') + '.xlsx';
-  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  if (NATIVE && NATIVE.shareFile) { NATIVE.shareFile(b64(u8), name, mime); return; }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([u8], {type: mime})); a.download = name;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-  toast('Excel descargado');
+  shareOut(u8, 'Informe visitas ' + dmy(visWk).replace(/\//g, '-') + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 });
 
 // ---------- importación desde Excel ----------
