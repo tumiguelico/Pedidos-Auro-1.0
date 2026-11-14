@@ -132,6 +132,32 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
 .cr span{font-size:12px;color:var(--soft)}
 .cr strong{font-variant-numeric:tabular-nums;white-space:nowrap}
 .cr i{display:block;height:4px;border-radius:2px;background:var(--accent);margin-top:4px}
+.wk{display:flex;align-items:center;gap:8px}
+.wk b{flex:1;text-align:center;font-size:14px}
+.wk button{width:44px;height:40px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:20px;line-height:1}
+.seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:9px 4px;font-weight:600;font-size:13px;color:var(--soft)}
+.seg button.on{background:var(--brand);color:#fff}
+.vd{font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;text-transform:capitalize}
+.vr{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:9px 0 0;width:100%;border-left:0;border-right:0;border-bottom:0;background:none;text-align:left}
+.vr div{flex:1;min-width:0}
+.vr b{display:block;font-size:14px}
+.vr span{display:block;font-size:12px;color:var(--soft)}
+.vr span.vf{color:var(--accent)}
+.vr strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.vr small{font-weight:400;font-size:12px;color:var(--soft)}
+.vchips{display:flex;flex-wrap:wrap;gap:6px}
+.vnote{margin:0;font-size:13px;color:var(--soft)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field select{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:11px 12px;font-size:16px;outline:none}
+.chk{display:flex;align-items:center;gap:10px;font-size:14px}
+.chk input{width:20px;height:20px;flex:none}
+.tl .vok{color:#128c4a;font-weight:700;font-size:13px;white-space:nowrap}
+.tl .vko{color:var(--danger);font-weight:700;font-size:13px;white-space:nowrap}
+.cmp{width:100%;border-collapse:collapse;font-size:13px}
+.cmp th{text-align:right;font-size:12px;color:var(--soft);font-weight:600;padding:6px 4px}
+.cmp td{text-align:right;padding:8px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.cmp th:first-child,.cmp td:first-child{text-align:left}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -143,6 +169,7 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
   <header>
     <div class="h-row">
       <select class="selT" id="selT" aria-label="Tarifa"></select>
+      <button class="hb" id="goVis">Visitas</button>
       <button class="hb" id="goEst">Resumen</button>
       <button class="hb" id="goHist">Historial</button>
       <button class="hb" id="goDat">Datos</button>
@@ -211,6 +238,16 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
   </div>
 </section>
 
+<!-- VISITAS -->
+<section id="vVis" hidden>
+  <header><div class="h-row"><button class="hb" data-back>‹ Tarifa</button><h1>Visitas<small id="visSub"></small></h1><button class="hb" id="vExp">Exportar Excel</button></div></header>
+  <div class="pane">
+    <div class="wk"><button id="wPrev" aria-label="Semana anterior">‹</button><b id="wLbl"></b><button id="wNext" aria-label="Semana siguiente">›</button></div>
+    <div class="seg" id="vSeg"><button data-s="inf">Informe semanal</button><button data-s="plan">Plan semana siguiente</button><button data-s="cmp">Plan vs realizado</button></div>
+    <div class="pane" id="vBody" style="padding:0"></div>
+  </div>
+</section>
+
 <!-- DATOS -->
 <section id="vDat" hidden>
   <header><div class="h-row"><button class="hb" data-back>‹ Tarifa</button><h1>Datos<small>Tarifas y base de clientes</small></h1></div></header>
@@ -243,6 +280,7 @@ h1 small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:1px
   <div class="row"><button class="btn ghost" id="mX">Cancelar</button><button class="btn" id="mOk">Guardar</button></div>
   <button class="btn del sm" id="mR" hidden>Volver al precio y descripción de tarifa</button>
 </div></div>
+<div class="ov" id="vov" hidden><div class="sheet" id="vForm"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>/*! xlsx.js (C) 2013-present SheetJS -- http://sheetjs.com */
@@ -664,6 +702,413 @@ $('eCliL').addEventListener('click', e => {
   estCli = b.dataset.k; renderEst(); window.scrollTo(0, 0);
 });
 
+// ---------- visitas: plan, informe semanal y comparativa ----------
+const VK = 'tp2-visitas', MAXV = 100;
+let V = load(VK, null);
+if (!V || typeof V !== 'object') V = {};
+V = Object.assign({vend: 'Miguel Ángel Muñoz Moreno', zona: '', weeks: {}}, V);
+if (!V.weeks || typeof V.weeks !== 'object') V.weeks = {};
+const TIPOS = ['Seguimiento', 'Nuevo cliente', 'Entrega', 'Cobro', 'Incidencia', 'Prospección'];
+const PRIOS = ['Alta', 'Media', 'Baja'];
+const ACCS = ['Prospección', 'Seguimiento', 'Pedido', 'Cobro', 'Entrega', 'Incidencia', 'Presentación de producto', 'No localizado / cerrado'];
+const DIAS_L = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+const p2 = n => String(n).padStart(2, '0');
+const isoD = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+const pD = s => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); };
+const addD = (s, n) => { const d = pD(s); d.setDate(d.getDate() + n); return isoD(d); };
+const monOf = d => { d = new Date(d.getFullYear(), d.getMonth(), d.getDate()); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return isoD(d); };
+const dmy = s => { const d = pD(s); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); };
+const dm = s => { const d = pD(s); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1); };
+const dow = s => (pD(s).getDay() + 6) % 7;
+const wkLbl = k => `${dm(k)} – ${dmy(addD(k, 6))}`;
+const dayLbl = s => DIAS_L[dow(s)] + ' ' + dm(s);
+const uid = () => 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const nv = v => { const n = pnum(v); return n == null ? 0 : n; };
+const telOf = name => { const c = CL.find(x => cliKey(x.n) === cliKey(name)); return c && c.t ? c.t : ''; };
+const inCL = name => CL.some(x => cliKey(x.n) === cliKey(name));
+function wk(k) {
+  const w = V.weeks[k] || (V.weeks[k] = {});
+  w.plan = Object.assign({rows: [], obj: '', com: '', km: '', ent: ''}, w.plan);
+  w.inf = Object.assign({rows: [], km: '', noLoc: '', incid: '', obs: '', ent: ''}, w.inf);
+  return w;
+}
+function saveV() {
+  // no se guardan las semanas que se han mirado pero están vacías
+  const out = Object.assign({}, V, {weeks: {}});
+  for (const k in V.weeks) {
+    const w = V.weeks[k], p = w.plan || {}, i = w.inf || {};
+    if ((p.rows || []).length || (i.rows || []).length || [p.obj, p.com, p.km, p.ent, i.km, i.noLoc, i.incid, i.obs, i.ent].some(x => x)) out.weeks[k] = w;
+  }
+  return store(VK, out);
+}
+const sortR = rows => rows.slice().sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : (a.hora || '').localeCompare(b.hora || '') || a.cli.localeCompare(b.cli, 'es'));
+function infSt(inf) {
+  const r = inf.rows;
+  return {n: r.length, ped: r.filter(x => x.ped === 'Sí').length, imp: r2(r.reduce((s, x) => s + (x.ped === 'Sí' ? +x.imp || 0 : 0), 0)),
+    nue: r.filter(x => x.nuevo).length, pot: r.filter(x => x.pot === 'Sí').length, km: nv(inf.km), noLoc: nv(inf.noLoc), inc: nv(inf.incid)};
+}
+function planSt(pl) {
+  const c = t => pl.rows.filter(x => x.tipo === t).length;
+  return {n: pl.rows.length, nue: c('Nuevo cliente') + c('Prospección'), seg: c('Seguimiento'), cob: c('Cobro') + c('Entrega'), inc: c('Incidencia'), km: nv(pl.km)};
+}
+const visited = (p, inf) => inf.rows.some(r => cliKey(r.cli) === cliKey(p.cli));
+
+// Los pedidos guardados en la app se apuntan solos en el informe de su semana
+function syncOrders(k) {
+  const w = wk(k), a = pD(k).getTime(), b = pD(addD(k, 7)).getTime(), g = {};
+  H.forEach(o => {
+    if (o.ts < a || o.ts >= b) return;
+    const ck = cliKey(o.cli); if (ck === '(sin cliente)') return;
+    const d = isoD(new Date(o.ts)), key = d + '|' + ck;
+    (g[key] = g[key] || {d, cli: o.cli, tel: o.tel || '', v: 0}).v += +o.total || 0;
+  });
+  let ch = false;
+  w.inf.rows.forEach(r => {
+    if (!r.oa) return;
+    const x = g[r.d + '|' + cliKey(r.cli)], ped = x ? 'Sí' : 'No', imp = x ? r2(x.v) : null;
+    if (r.ped !== ped || r.imp !== imp) { r.ped = ped; r.imp = imp; ch = true; }
+  });
+  Object.values(g).forEach(x => {
+    if (w.inf.rows.some(r => r.d === x.d && cliKey(r.cli) === cliKey(x.cli)) || w.inf.rows.length >= MAXV) return;
+    w.inf.rows.push({id: uid(), d: x.d, cli: x.cli, tel: x.tel || telOf(x.cli), acc: 'Pedido', ped: 'Sí', imp: r2(x.v), prox: '', pot: 'No', del: 'No', nuevo: false, oa: true});
+    ch = true;
+  });
+  if (ch) saveV();
+}
+
+let visWk = monOf(new Date()), visTab = 'inf', VF = null;
+const kpiV = (t, v, sub, main) => `<div class="kpi${main ? ' main' : ''}"><span>${esc(t)}</span><b>${v}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+const fldV = (lbl, k, val, type, extra) => `<div class="field"><label>${esc(lbl)}</label><input data-k="${k}" type="${type || 'text'}" value="${esc(val)}" autocomplete="off"${extra || ''}></div>`;
+const txtV = (lbl, k, val) => `<div class="field"><label>${esc(lbl)}</label><textarea data-k="${k}">${esc(val)}</textarea></div>`;
+function rowsV(rows, kind) {
+  if (!rows.length) return `<p>${kind === 'inf' ? 'Aún no hay visitas en esta semana.' : 'Aún no hay visitas planificadas.'}</p>`;
+  let last = '', h = '';
+  sortR(rows).forEach(r => {
+    if (r.d !== last) { last = r.d; h += `<div class="vd">${esc(dayLbl(r.d))}</div>`; }
+    if (kind === 'inf') {
+      const t = [r.acc, r.prox && 'Próximo: ' + r.prox].filter(Boolean).join(' · ');
+      const f = [r.nuevo && 'Cliente nuevo', r.pot === 'Sí' && 'Potencial', r.del === 'Sí' && 'Con delegado'].filter(Boolean).join(' · ');
+      h += `<button class="vr" data-ri="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${t ? `<span>${esc(t)}</span>` : ''}${f ? `<span class="vf">${esc(f)}</span>` : ''}</div><strong>${r.ped === 'Sí' ? eur(+r.imp || 0) : '<small>Sin pedido</small>'}</strong></button>`;
+    } else {
+      const t = [r.hora, r.tipo, r.prio && 'Prioridad ' + r.prio.toLowerCase()].filter(Boolean).join(' · ');
+      h += `<button class="vr" data-rp="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${t ? `<span>${esc(t)}</span>` : ''}${r.obj ? `<span>${esc(r.obj)}</span>` : ''}</div><strong>›</strong></button>`;
+    }
+  });
+  return h;
+}
+function renderVis() {
+  const k = visWk, nk = addD(k, 7);
+  syncOrders(k);
+  const w = wk(k), inf = w.inf, si = infSt(inf);
+  $('wLbl').textContent = 'Semana ' + wkLbl(k) + (k === monOf(new Date()) ? ' · actual' : '');
+  $('visSub').textContent = `${si.n} ${si.n === 1 ? 'visita' : 'visitas'} · ${eur(si.imp)}`;
+  $('vSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === visTab));
+  let h = '';
+  if (visTab === 'inf') {
+    const pend = sortR(w.plan.rows.filter(p => !visited(p, inf)));
+    h = `<div class="kpis">${kpiV('Importe pedidos', eur(si.imp), nPed(si.ped), true)}${kpiV('Visitas', si.n, 'máximo ' + MAXV)}${kpiV('Nuevos clientes', si.nue, 'captados')}${kpiV('Potenciales', si.pot, 'detectados')}${kpiV('Km', num(si.km), 'recorridos')}${kpiV('Incidencias', num(si.inc), 'o reclamaciones')}</div>
+    <div class="box"><div class="bh"><h2>Visitas realizadas</h2><span class="meta">${si.n} / ${MAXV}</span></div>
+    ${pend.length ? `<p>Del plan de esta semana, sin visitar todavía. Toca uno para apuntar la visita:</p><div class="vchips">${pend.map(p => `<button class="chip" data-pv="${esc(p.id)}">${esc(dayLbl(p.d).split(' ')[0] + ' · ' + p.cli)}</button>`).join('')}</div>` : ''}
+    ${rowsV(inf.rows, 'inf')}
+    <button class="btn full${si.n >= MAXV ? ' off' : ''}" data-v="addInf">+ Añadir visita</button>
+    <p>Los pedidos que guardas en la app se apuntan solos aquí, en su día y cliente («¿Pedido?» e importe).</p></div>
+    <div class="box"><h2>Resumen de control</h2><div class="grid2">${fldV('Km recorridos', 'inf.km', inf.km, 'text', ' inputmode="decimal"')}${fldV('Clientes no localizados / cerrados', 'inf.noLoc', inf.noLoc, 'text', ' inputmode="numeric"')}${fldV('Incidencias o reclamaciones', 'inf.incid', inf.incid, 'text', ' inputmode="numeric"')}${fldV('Fecha de entrega', 'inf.ent', inf.ent, 'date')}</div>
+    ${txtV('Observaciones generales y plan para la semana siguiente', 'inf.obs', inf.obs)}</div>
+    <div class="box"><h2>Datos del informe</h2><div class="grid2">${fldV('Vendedor', 'vend', V.vend)}${fldV('Zona / Ruta', 'zona', V.zona)}</div></div>`;
+  } else if (visTab === 'plan') {
+    const pl = wk(nk).plan, sp = planSt(pl);
+    h = `<p class="vnote">Planificas la semana del <b>${dmy(nk)}</b> al <b>${dmy(addD(nk, 6))}</b>. Cuando llegue esa semana, este plan se compara con lo realizado.</p>
+    <div class="kpis">${kpiV('Visitas previstas', sp.n, 'máximo ' + MAXV, true)}${kpiV('Nuevos', sp.nue, 'a prospectar')}${kpiV('Seguimiento', sp.seg)}${kpiV('Cobro / entrega', sp.cob)}${kpiV('Incidencias', sp.inc, 'a resolver')}${kpiV('Km', num(sp.km), 'estimados')}</div>
+    <div class="box"><div class="bh"><h2>Visitas planificadas</h2><span class="meta">${sp.n} / ${MAXV}</span></div>
+    ${rowsV(pl.rows, 'plan')}
+    <button class="btn full${sp.n >= MAXV ? ' off' : ''}" data-v="addPlan">+ Añadir visita planificada</button></div>
+    <div class="box"><h2>Datos del plan</h2>${txtV('Objetivo principal de la semana', 'plan.obj', pl.obj)}
+    <div class="grid2">${fldV('Km estimados', 'plan.km', pl.km, 'text', ' inputmode="decimal"')}${fldV('Fecha entrega del plan', 'plan.ent', pl.ent, 'date')}</div>
+    ${txtV('Comentarios del delegado / ajustes al plan', 'plan.com', pl.com)}</div>`;
+  } else {
+    const pl = w.plan, sp = planSt(pl), vis = pl.rows.filter(p => visited(p, inf)).length;
+    const pc = (a, b) => a > 0 ? Math.round(b / a * 100) + ' %' : '—';
+    const dif = si.inc - sp.inc;
+    h = `<p class="vnote">Plan de la semana ${wkLbl(k)} (hecho la semana anterior) comparado con su informe semanal.</p>
+    <div class="box"><h2>Indicadores de la semana</h2><table class="cmp"><tr><th>Indicador</th><th>Previsto</th><th>Realizado</th><th>Cumplim.</th></tr>
+    <tr><td>Nº de visitas</td><td>${sp.n}</td><td>${si.n}</td><td>${pc(sp.n, si.n)}</td></tr>
+    <tr><td>Nuevos clientes</td><td>${sp.nue}</td><td>${si.nue}</td><td>${pc(sp.nue, si.nue)}</td></tr>
+    <tr><td>Km</td><td>${num(sp.km)}</td><td>${num(si.km)}</td><td>${pc(sp.km, si.km)}</td></tr>
+    <tr><td>Incidencias</td><td>${sp.inc}</td><td>${num(si.inc)}</td><td>${(dif > 0 ? '+' : '') + num(dif)}</td></tr></table></div>
+    <div class="box"><div class="bh"><h2>Seguimiento cliente a cliente</h2><span class="meta">${vis} / ${sp.n} visitadas</span></div>
+    ${pl.rows.length ? sortR(pl.rows).map(p => { const ok = visited(p, inf); return `<div class="tl"><div><b>${esc(p.cli)}</b><span>${esc([dayLbl(p.d), p.tipo, p.prio].filter(Boolean).join(' · '))}</span></div><span class="${ok ? 'vok' : 'vko'}">${ok ? '✓ Visitado' : '✕ No visitado'}</span></div>`; }).join('')
+      : '<p>No hay plan para esta semana. Se prepara en «Plan semana siguiente» durante la semana anterior.</p>'}</div>`;
+  }
+  $('vBody').innerHTML = h;
+}
+function setVK(k, v) {
+  const [a, b] = k.split('.');
+  if (!b) V[a] = v; else (a === 'plan' ? wk(addD(visWk, 7)).plan : wk(visWk).inf)[b] = v;
+  saveV();
+}
+$('vBody').addEventListener('input', e => { const el = e.target.closest('[data-k]'); if (el) setVK(el.dataset.k, el.value); });
+$('vBody').addEventListener('change', e => {
+  const el = e.target.closest('[data-k]'); if (!el) return;
+  if (/km|noLoc|incid/.test(el.dataset.k)) renderVis();
+});
+$('vBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-v],[data-ri],[data-rp],[data-pv]'); if (!b) return;
+  if (b.dataset.v) { openVis(b.dataset.v === 'addInf' ? 'inf' : 'plan'); return; }
+  if (b.dataset.ri) { const r = wk(visWk).inf.rows.find(x => x.id === b.dataset.ri); if (r) openVis('inf', r); return; }
+  if (b.dataset.rp) { const r = wk(addD(visWk, 7)).plan.rows.find(x => x.id === b.dataset.rp); if (r) openVis('plan', r); return; }
+  const p = wk(visWk).plan.rows.find(x => x.id === b.dataset.pv); if (!p) return;
+  openVis('inf', null, {d: p.d, cli: p.cli, tel: telOf(p.cli), acc: p.tipo === 'Nuevo cliente' ? 'Prospección' : p.tipo || '', nuevo: p.tipo === 'Nuevo cliente' && !inCL(p.cli)});
+});
+$('vSeg').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; visTab = b.dataset.s; renderVis(); window.scrollTo(0, 0); });
+$('wPrev').addEventListener('click', () => { visWk = addD(visWk, -7); renderVis(); });
+$('wNext').addEventListener('click', () => { visWk = addD(visWk, 7); renderVis(); });
+
+// ----- formulario de una visita -----
+function openVis(kind, row, pre) {
+  const k = kind === 'inf' ? visWk : addD(visWk, 7);
+  const list = kind === 'inf' ? wk(k).inf.rows : wk(k).plan.rows;
+  if (!row && list.length >= MAXV) { toast('Como máximo ' + MAXV + ' visitas por semana'); return; }
+  const today = isoD(new Date()), d0 = today >= k && today <= addD(k, 6) ? today : k;
+  const r = Object.assign(kind === 'inf'
+    ? {d: d0, cli: '', tel: '', acc: '', ped: 'No', imp: null, prox: '', pot: 'No', del: 'No', nuevo: false, oa: true}
+    : {d: d0, cli: '', dir: '', hora: '', obj: '', tipo: 'Seguimiento', prio: 'Media', obs: ''}, row || {}, pre || {});
+  VF = {kind, k, list, row, r, ped0: r.ped, imp0: r.imp, nTouched: !!row, del: false};
+  const sel = (id, opts, v) => `<select id="${id}">${opts.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => addD(k, i));
+  let h = `<h2>${row ? 'Modificar visita' : kind === 'inf' ? 'Nueva visita' : 'Nueva visita planificada'}</h2><p>Semana ${esc(wkLbl(k))}</p>
+    <div class="field"><label for="vfD">Día</label><select id="vfD">${days.map(d => `<option value="${d}"${d === r.d ? ' selected' : ''}>${esc(DIAS_L[dow(d)] + ' ' + dmy(d))}</option>`).join('')}</select></div>
+    <div class="field"><label for="vfC">Cliente</label><input id="vfC" value="${esc(r.cli)}" placeholder="Escribe para buscar en la base de clientes" autocomplete="off"><div class="sug" id="vfS" hidden></div></div>`;
+  if (kind === 'inf') h += `
+    <label class="chk"><input type="checkbox" id="vfN"${r.nuevo ? ' checked' : ''}> Cliente nuevo (se guarda también en la base de clientes)</label>
+    <div class="field"><label for="vfT">Teléfono</label><input id="vfT" type="tel" inputmode="tel" value="${esc(r.tel)}" autocomplete="off"></div>
+    <div class="field"><label for="vfA">Acción realizada</label><input id="vfA" list="vfAL" value="${esc(r.acc)}" placeholder="Prospección, seguimiento, cobro…" autocomplete="off"><datalist id="vfAL">${ACCS.map(a => `<option value="${esc(a)}">`).join('')}</datalist></div>
+    <div class="grid2"><div class="field"><label for="vfP">¿Pedido?</label>${sel('vfP', ['No', 'Sí'], r.ped)}</div><div class="field"><label for="vfI">Importe (€)</label><input id="vfI" inputmode="decimal" value="${r.imp != null ? esc(String(r.imp).replace('.', ',')) : ''}" autocomplete="off"></div></div>
+    <div class="field"><label for="vfX">Próximas acciones</label><input id="vfX" value="${esc(r.prox)}" autocomplete="off"></div>
+    <div class="grid2"><div class="field"><label for="vfO">Potencial</label>${sel('vfO', ['No', 'Sí'], r.pot)}</div><div class="field"><label for="vfL">Visita con delegado</label>${sel('vfL', ['No', 'Sí'], r.del)}</div></div>
+    ${r.oa ? '<p>«¿Pedido?» e importe se rellenan solos con los pedidos guardados ese día para este cliente. Si los cambias a mano, se queda lo que escribas.</p>' : ''}`;
+  else h += `
+    <div class="field"><label for="vfR">Dirección / zona</label><input id="vfR" value="${esc(r.dir)}" autocomplete="off"></div>
+    <div class="grid2"><div class="field"><label for="vfH">Hora prevista</label><input id="vfH" type="time" value="${esc(r.hora)}"></div><div class="field"><label for="vfY">Prioridad</label>${sel('vfY', PRIOS, r.prio)}</div></div>
+    <div class="field"><label for="vfTi">Tipo de visita</label>${sel('vfTi', TIPOS, r.tipo)}</div>
+    <div class="field"><label for="vfB">Objetivo de la visita</label><input id="vfB" value="${esc(r.obj)}" autocomplete="off"></div>
+    <div class="field"><label for="vfZ">Observaciones / material necesario</label><textarea id="vfZ">${esc(r.obs)}</textarea></div>`;
+  h += `<div class="row"><button class="btn ghost" id="vfCan">Cancelar</button><button class="btn" id="vfOk">Guardar</button></div>${row ? '<button class="btn del sm" id="vfDel">Borrar visita</button>' : ''}`;
+  $('vForm').innerHTML = h; $('vov').hidden = false;
+}
+const closeVis = () => { $('vov').hidden = true; VF = null; };
+function sugVis() {
+  const words = norm($('vfC').value).split(/\s+/).filter(Boolean), s = $('vfS');
+  if (VF.kind === 'inf' && !VF.nTouched) $('vfN').checked = !!words.length && !inCL($('vfC').value);
+  if (!words.length || !CL.length) { s.hidden = true; return; }
+  const res = [];
+  for (let i = 0; i < CL.length && res.length < 8; i++) {
+    const c = CL[i], hay = c.h || (c.h = norm([c.n, c.c, c.l].join(' ')));
+    if (words.every(w => hay.includes(w))) res.push(i);
+  }
+  if (!res.length || (res.length === 1 && CL[res[0]].n === $('vfC').value)) { s.hidden = true; return; }
+  s.innerHTML = res.map(i => { const c = CL[i]; return `<button type="button" data-i="${i}"><b>${esc(c.n)}</b><span>${esc([c.c, c.l, c.t].filter(Boolean).join(' · '))}</span></button>`; }).join('');
+  s.hidden = false;
+}
+function saveVis() {
+  const g = id => $(id) ? $(id).value.trim() : '';
+  const cli = g('vfC'); if (!cli) { toast('Escribe el cliente'); return; }
+  const r = VF.r; r.d = $('vfD').value; r.cli = cli;
+  if (VF.kind === 'inf') {
+    const t = g('vfI'), imp = pnum(t);
+    if (t && (imp == null || imp < 0)) { toast('Escribe un importe válido'); return; }
+    const ped = $('vfP').value, impV = imp == null ? null : r2(imp);
+    if (ped !== VF.ped0 || impV !== VF.imp0) r.oa = false;
+    Object.assign(r, {tel: g('vfT'), acc: g('vfA'), ped, imp: impV, prox: g('vfX'), pot: $('vfO').value, del: $('vfL').value, nuevo: $('vfN').checked});
+    if (r.nuevo && !inCL(cli)) {
+      const c = {n: cli}; if (r.tel) c.t = r.tel;
+      CL.push(c); CL.sort((a, b) => a.n.localeCompare(b.n, 'es')); saveC();
+      toast('Cliente nuevo añadido a la base de clientes');
+    }
+  } else Object.assign(r, {dir: g('vfR'), hora: g('vfH'), prio: $('vfY').value, tipo: $('vfTi').value, obj: g('vfB'), obs: g('vfZ')});
+  if (VF.row) Object.assign(VF.row, r); else { r.id = uid(); VF.list.push(r); }
+  saveV(); closeVis(); renderVis();
+}
+$('vForm').addEventListener('input', e => { if (e.target.id === 'vfC') sugVis(); });
+$('vForm').addEventListener('change', e => { if (e.target.id === 'vfN' && VF) VF.nTouched = true; });
+$('vForm').addEventListener('click', e => {
+  const sb = e.target.closest('#vfS button');
+  if (sb) {
+    const c = CL[+sb.dataset.i]; $('vfC').value = c.n; $('vfS').hidden = true;
+    if (VF.kind === 'inf') { if (c.t && !$('vfT').value) $('vfT').value = c.t; if (!VF.nTouched) $('vfN').checked = false; }
+    else if (!$('vfR').value) $('vfR').value = c.l || '';
+    return;
+  }
+  const id = e.target.id;
+  if (id === 'vfCan') closeVis();
+  else if (id === 'vfOk') saveVis();
+  else if (id === 'vfDel') {
+    if (!VF.del) { VF.del = true; e.target.textContent = '¿Seguro? Pulsa otra vez'; return; }
+    const i = VF.list.indexOf(VF.row); if (i >= 0) VF.list.splice(i, 1);
+    saveV(); closeVis(); renderVis(); toast('Visita borrada');
+  }
+});
+$('vov').addEventListener('click', e => { if (e.target === $('vov')) closeVis(); });
+
+// ----- Excel con el mismo formato que «Control_Visitas_Comerciales» (100 filas por hoja) -----
+const XSTY = "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?\u003e\r\n\u003cstyleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"x14ac x16r2 xr\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:x16r2=\"http://schemas.microsoft.com/office/spreadsheetml/2015/02/main\" xmlns:xr=\"http://schemas.microsoft.com/office/spreadsheetml/2014/revision\"\u003e\u003cnumFmts count=\"2\"\u003e\u003cnumFmt numFmtId=\"164\" formatCode=\"#,##0.00\u0026quot; €\u0026quot;;\\(#,##0.00\u0026quot; €)\u0026quot;;\\-\"/\u003e\u003cnumFmt numFmtId=\"165\" formatCode=\"h:mm;@\"/\u003e\u003c/numFmts\u003e\u003cfonts count=\"9\" x14ac:knownFonts=\"1\"\u003e\u003cfont\u003e\u003csz val=\"11\"/\u003e\u003ccolor theme=\"1\"/\u003e\u003cname val=\"Calibri\"/\u003e\u003cfamily val=\"2\"/\u003e\u003ccharset val=\"1\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"16\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003ccolor rgb=\"FFFFFFFF\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"12\"/\u003e\u003ccolor rgb=\"FF1F3A5F\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003cb/\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"10\"/\u003e\u003cname val=\"Arial\"/\u003e\u003cfamily val=\"2\"/\u003e\u003c/font\u003e\u003cfont\u003e\u003csz val=\"8\"/\u003e\u003cname val=\"Calibri\"/\u003e\u003cfamily val=\"2\"/\u003e\u003ccharset val=\"1\"/\u003e\u003c/font\u003e\u003c/fonts\u003e\u003cfills count=\"4\"\u003e\u003cfill\u003e\u003cpatternFill patternType=\"none\"/\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"gray125\"/\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"solid\"\u003e\u003cfgColor rgb=\"FFDCE6F1\"/\u003e\u003cbgColor rgb=\"FFCCFFFF\"/\u003e\u003c/patternFill\u003e\u003c/fill\u003e\u003cfill\u003e\u003cpatternFill patternType=\"solid\"\u003e\u003cfgColor rgb=\"FF1F3A5F\"/\u003e\u003cbgColor rgb=\"FF333333\"/\u003e\u003c/patternFill\u003e\u003c/fill\u003e\u003c/fills\u003e\u003cborders count=\"4\"\u003e\u003cborder\u003e\u003cleft/\u003e\u003cright/\u003e\u003ctop/\u003e\u003cbottom/\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/right\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/bottom\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright/\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/bottom\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003cborder\u003e\u003cleft style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/left\u003e\u003cright/\u003e\u003ctop style=\"thin\"\u003e\u003ccolor rgb=\"FFBFBFBF\"/\u003e\u003c/top\u003e\u003cbottom/\u003e\u003cdiagonal/\u003e\u003c/border\u003e\u003c/borders\u003e\u003ccellStyleXfs count=\"1\"\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/\u003e\u003c/cellStyleXfs\u003e\u003ccellXfs count=\"26\"\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"2\" fillId=\"2\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"4\" fillId=\"3\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"164\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"164\" fontId=\"6\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"165\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"165\" fontId=\"3\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"14\" fontId=\"3\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"5\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/\u003e\u003cxf numFmtId=\"0\" fontId=\"2\" fillId=\"2\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"3\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"7\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"4\" fillId=\"3\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"0\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003cxf numFmtId=\"9\" fontId=\"6\" fillId=\"0\" borderId=\"2\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"\u003e\u003calignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/\u003e\u003c/xf\u003e\u003c/cellXfs\u003e\u003ccellStyles count=\"1\"\u003e\u003ccellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/\u003e\u003c/cellStyles\u003e\u003cdxfs count=\"0\"/\u003e\u003ctableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium2\" defaultPivotStyle=\"PivotStyleLight16\"/\u003e\u003ccolors\u003e\u003cindexedColors\u003e\u003crgbColor rgb=\"FF000000\"/\u003e\u003crgbColor rgb=\"FFFFFFFF\"/\u003e\u003crgbColor rgb=\"FFFF0000\"/\u003e\u003crgbColor rgb=\"FF00FF00\"/\u003e\u003crgbColor rgb=\"FF0000FF\"/\u003e\u003crgbColor rgb=\"FFFFFF00\"/\u003e\u003crgbColor rgb=\"FFFF00FF\"/\u003e\u003crgbColor rgb=\"FF00FFFF\"/\u003e\u003crgbColor rgb=\"FF800000\"/\u003e\u003crgbColor rgb=\"FF008000\"/\u003e\u003crgbColor rgb=\"FF000080\"/\u003e\u003crgbColor rgb=\"FF808000\"/\u003e\u003crgbColor rgb=\"FF800080\"/\u003e\u003crgbColor rgb=\"FF008080\"/\u003e\u003crgbColor rgb=\"FFBFBFBF\"/\u003e\u003crgbColor rgb=\"FF808080\"/\u003e\u003crgbColor rgb=\"FF9999FF\"/\u003e\u003crgbColor rgb=\"FF993366\"/\u003e\u003crgbColor rgb=\"FFFFFFCC\"/\u003e\u003crgbColor rgb=\"FFDCE6F1\"/\u003e\u003crgbColor rgb=\"FF660066\"/\u003e\u003crgbColor rgb=\"FFFF8080\"/\u003e\u003crgbColor rgb=\"FF0066CC\"/\u003e\u003crgbColor rgb=\"FFCCCCFF\"/\u003e\u003crgbColor rgb=\"FF000080\"/\u003e\u003crgbColor rgb=\"FFFF00FF\"/\u003e\u003crgbColor rgb=\"FFFFFF00\"/\u003e\u003crgbColor rgb=\"FF00FFFF\"/\u003e\u003crgbColor rgb=\"FF800080\"/\u003e\u003crgbColor rgb=\"FF800000\"/\u003e\u003crgbColor rgb=\"FF008080\"/\u003e\u003crgbColor rgb=\"FF0000FF\"/\u003e\u003crgbColor rgb=\"FF00CCFF\"/\u003e\u003crgbColor rgb=\"FFCCFFFF\"/\u003e\u003crgbColor rgb=\"FFCCFFCC\"/\u003e\u003crgbColor rgb=\"FFFFFF99\"/\u003e\u003crgbColor rgb=\"FF99CCFF\"/\u003e\u003crgbColor rgb=\"FFFF99CC\"/\u003e\u003crgbColor rgb=\"FFCC99FF\"/\u003e\u003crgbColor rgb=\"FFFFCC99\"/\u003e\u003crgbColor rgb=\"FF3366FF\"/\u003e\u003crgbColor rgb=\"FF33CCCC\"/\u003e\u003crgbColor rgb=\"FF99CC00\"/\u003e\u003crgbColor rgb=\"FFFFCC00\"/\u003e\u003crgbColor rgb=\"FFFF9900\"/\u003e\u003crgbColor rgb=\"FFFF6600\"/\u003e\u003crgbColor rgb=\"FF666699\"/\u003e\u003crgbColor rgb=\"FF969696\"/\u003e\u003crgbColor rgb=\"FF1F3A5F\"/\u003e\u003crgbColor rgb=\"FF339966\"/\u003e\u003crgbColor rgb=\"FF003300\"/\u003e\u003crgbColor rgb=\"FF333300\"/\u003e\u003crgbColor rgb=\"FF993300\"/\u003e\u003crgbColor rgb=\"FF993366\"/\u003e\u003crgbColor rgb=\"FF333399\"/\u003e\u003crgbColor rgb=\"FF333333\"/\u003e\u003crgbColor rgb=\"00003366\"/\u003e\u003crgbColor rgb=\"00339966\"/\u003e\u003crgbColor rgb=\"00003300\"/\u003e\u003crgbColor rgb=\"00333300\"/\u003e\u003crgbColor rgb=\"00993300\"/\u003e\u003crgbColor rgb=\"00993366\"/\u003e\u003crgbColor rgb=\"00333399\"/\u003e\u003crgbColor rgb=\"00333333\"/\u003e\u003c/indexedColors\u003e\u003c/colors\u003e\u003c/styleSheet\u003e";
+const XTHEME = "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?\u003e\r\n\u003ca:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Office Theme\"\u003e\u003ca:themeElements\u003e\u003ca:clrScheme name=\"Office\"\u003e\u003ca:dk1\u003e\u003ca:srgbClr val=\"000000\"/\u003e\u003c/a:dk1\u003e\u003ca:lt1\u003e\u003ca:srgbClr val=\"FFFFFF\"/\u003e\u003c/a:lt1\u003e\u003ca:dk2\u003e\u003ca:srgbClr val=\"1F497D\"/\u003e\u003c/a:dk2\u003e\u003ca:lt2\u003e\u003ca:srgbClr val=\"EEECE1\"/\u003e\u003c/a:lt2\u003e\u003ca:accent1\u003e\u003ca:srgbClr val=\"4F81BD\"/\u003e\u003c/a:accent1\u003e\u003ca:accent2\u003e\u003ca:srgbClr val=\"C0504D\"/\u003e\u003c/a:accent2\u003e\u003ca:accent3\u003e\u003ca:srgbClr val=\"9BBB59\"/\u003e\u003c/a:accent3\u003e\u003ca:accent4\u003e\u003ca:srgbClr val=\"8064A2\"/\u003e\u003c/a:accent4\u003e\u003ca:accent5\u003e\u003ca:srgbClr val=\"4BACC6\"/\u003e\u003c/a:accent5\u003e\u003ca:accent6\u003e\u003ca:srgbClr val=\"F79646\"/\u003e\u003c/a:accent6\u003e\u003ca:hlink\u003e\u003ca:srgbClr val=\"0000FF\"/\u003e\u003c/a:hlink\u003e\u003ca:folHlink\u003e\u003ca:srgbClr val=\"800080\"/\u003e\u003c/a:folHlink\u003e\u003c/a:clrScheme\u003e\u003ca:fontScheme name=\"Office\"\u003e\u003ca:majorFont\u003e\u003ca:latin typeface=\"Cambria\"/\u003e\u003ca:ea typeface=\"\"/\u003e\u003ca:cs typeface=\"\"/\u003e\u003c/a:majorFont\u003e\u003ca:minorFont\u003e\u003ca:latin typeface=\"Calibri\"/\u003e\u003ca:ea typeface=\"\"/\u003e\u003ca:cs typeface=\"\"/\u003e\u003c/a:minorFont\u003e\u003c/a:fontScheme\u003e\u003ca:fmtScheme\u003e\u003ca:fillStyleLst\u003e\u003ca:solidFill\u003e\u003ca:schemeClr val=\"phClr\"/\u003e\u003c/a:solidFill\u003e\u003ca:gradFill\u003e\u003ca:gsLst\u003e\u003ca:gs pos=\"0\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"50000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"35000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"37000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"100000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"15000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003c/a:gsLst\u003e\u003ca:lin ang=\"16200000\" scaled=\"1\"/\u003e\u003ca:tileRect/\u003e\u003c/a:gradFill\u003e\u003ca:gradFill\u003e\u003ca:gsLst\u003e\u003ca:gs pos=\"0\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:shade val=\"51000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"80000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:shade val=\"93000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"100000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:shade val=\"94000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003c/a:gsLst\u003e\u003ca:lin ang=\"16200000\" scaled=\"0\"/\u003e\u003ca:tileRect/\u003e\u003c/a:gradFill\u003e\u003c/a:fillStyleLst\u003e\u003ca:lnStyleLst\u003e\u003ca:ln w=\"9525\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\"\u003e\u003ca:prstDash val=\"solid\"/\u003e\u003c/a:ln\u003e\u003ca:ln w=\"25400\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\"\u003e\u003ca:prstDash val=\"solid\"/\u003e\u003c/a:ln\u003e\u003ca:ln w=\"38100\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\"\u003e\u003ca:prstDash val=\"solid\"/\u003e\u003c/a:ln\u003e\u003c/a:lnStyleLst\u003e\u003ca:effectStyleLst\u003e\u003ca:effectStyle\u003e\u003ca:effectLst/\u003e\u003c/a:effectStyle\u003e\u003ca:effectStyle\u003e\u003ca:effectLst/\u003e\u003c/a:effectStyle\u003e\u003ca:effectStyle\u003e\u003ca:effectLst/\u003e\u003c/a:effectStyle\u003e\u003c/a:effectStyleLst\u003e\u003ca:bgFillStyleLst\u003e\u003ca:solidFill\u003e\u003ca:schemeClr val=\"phClr\"/\u003e\u003c/a:solidFill\u003e\u003ca:gradFill\u003e\u003ca:gsLst\u003e\u003ca:gs pos=\"0\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"40000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"40000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"45000\"/\u003e\u003ca:shade val=\"99000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"100000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:shade val=\"20000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003c/a:gsLst\u003e\u003ca:path path=\"circle\"\u003e\u003ca:fillToRect l=\"50000\" t=\"-80000\" r=\"50000\" b=\"180000\"/\u003e\u003c/a:path\u003e\u003ca:tileRect/\u003e\u003c/a:gradFill\u003e\u003ca:gradFill\u003e\u003ca:gsLst\u003e\u003ca:gs pos=\"0\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:tint val=\"80000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003ca:gs pos=\"100000\"\u003e\u003ca:schemeClr val=\"phClr\"\u003e\u003ca:shade val=\"30000\"/\u003e\u003c/a:schemeClr\u003e\u003c/a:gs\u003e\u003c/a:gsLst\u003e\u003ca:path path=\"circle\"\u003e\u003ca:fillToRect l=\"50000\" t=\"50000\" r=\"50000\" b=\"50000\"/\u003e\u003c/a:path\u003e\u003ca:tileRect/\u003e\u003c/a:gradFill\u003e\u003c/a:bgFillStyleLst\u003e\u003c/a:fmtScheme\u003e\u003c/a:themeElements\u003e\u003ca:objectDefaults/\u003e\u003ca:extraClrSchemeLst/\u003e\u003c/a:theme\u003e";
+const XNS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main', XNSR = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const XSN = ['Plan Semana Siguiente', 'Informe Semanal', 'Comparativa Plan vs Realizado'];
+const xe = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const xSer = s => { const d = pD(s); return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 864e5); };
+const xTime = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ''); return m ? (+m[1] * 60 + +m[2]) / 1440 : (s || null); };
+function xc(ref, s, v) {
+  if (v == null || v === '') return `<c r="${ref}" s="${s}"/>`;
+  if (typeof v === 'number') return `<c r="${ref}" s="${s}"><v>${v}</v></c>`;
+  if (typeof v === 'object') return `<c r="${ref}" s="${s}"${typeof v.v === 'string' ? ' t="str"' : ''}><f>${xe(v.f)}</f><v>${v.v == null ? '' : xe(v.v)}</v></c>`;
+  return `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+}
+// fila: [[columna, estilo, valor], ...]
+const xR = (n, ht, cells) => `<row r="${n}"${ht ? ` ht="${ht}" customHeight="1"` : ''}>${cells.map(([c, s, v]) => xc(c + n, s, v)).join('')}</row>`;
+const xFill = (cols, s, v) => cols.split('').map((c, i) => [c, s, i ? null : v]);
+const xHt = (min, parts) => {
+  const lines = Math.max(1, ...parts.map(([t, w]) => String(t || '').split('\n').reduce((a, p) => a + Math.max(1, Math.ceil(p.length / Math.max(1, w * 1.1))), 0)));
+  return Math.max(min, Math.min(400, lines * 13 + 5));
+};
+function xSheet(o) {
+  const top = 'A' + (o.fz + 1);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="${XNS}" xmlns:r="${XNSR}"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="${o.dim}"/>`
+    + `<sheetViews><sheetView showGridLines="0"${o.sel ? ' tabSelected="1"' : ''} workbookViewId="0"><pane ySplit="${o.fz}" topLeftCell="${top}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="${top}" sqref="${top}"/></sheetView></sheetViews>`
+    + `<sheetFormatPr defaultRowHeight="15"/><cols>${o.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`
+    + `<sheetData>${o.rows.join('')}</sheetData><mergeCells count="${o.m.length}">${o.m.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>`
+    + (o.dv.length ? `<dataValidations count="${o.dv.length}">${o.dv.map(([sq, l]) => `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="${sq}"><formula1>&quot;${xe(l)}&quot;</formula1></dataValidation>`).join('')}</dataValidations>` : '')
+    + `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToHeight="0"/></worksheet>`;
+}
+const XL = 6 + MAXV; // última fila de datos (106)
+function xPlan(k, pl) {
+  const sp = planSt(pl), rows = sortR(pl.rows), a = XL + 2, R = [], F = `F7:F${XL}`;
+  R.push(xR(1, 25.5, xFill('ABCDEFGH', 14, 'PLAN DE VISITAS — SEMANA SIGUIENTE')));
+  R.push(xR(3, 18, [['A', 1, 'Vendedor:'], ['B', 9], ['C', 15, V.vend], ['D', 15], ['E', 1, 'Zona / Ruta:'], ['G', 16, V.zona], ['H', 16]]));
+  R.push(xR(4, 25.5, [['A', 1, 'Semana a planificar (del/al):'], ['B', 9], ['C', 15, `del ${dmy(k)} al ${dmy(addD(k, 6))}`], ['D', 15], ['E', 1, 'Fecha entrega del plan:'], ['G', 17, pl.ent ? xSer(pl.ent) : null], ['H', 15]]));
+  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Dirección / Zona', 'Hora prevista', 'Objetivo de la visita', 'Tipo de visita', 'Prioridad', 'Observaciones / Material necesario'].map((t, i) => ['ABCDEFGH'[i], 2, t])));
+  for (let i = 0; i < MAXV; i++) {
+    const r = rows[i] || {}, n = 7 + i;
+    R.push(xR(n, xHt(18, [[r.cli, 23], [r.dir, 22], [r.obj, 28], [r.obs, 32]]), [['A', 12, r.d ? xSer(r.d) : null], ['B', 3, r.cli], ['C', 3, r.dir], ['D', 13, xTime(r.hora)], ['E', 3, r.obj], ['F', 3, r.tipo], ['G', 3, r.prio], ['H', 3, r.obs]]));
+  }
+  R.push(xR(a, 18, xFill('ABCDEFGH', 18, 'Resumen de la semana a planificar')));
+  const sum = (n, l1, v1, l2, v2) => xR(n, 18, [['A', 19, l1], ['B', 19], ['C', 20, v1], ['D', 20], ['E', 19, l2], ['F', 19], ['G', 20, v2], ['H', 20]]);
+  R.push(sum(a + 1, 'Nº total de visitas previstas', {f: `COUNTA(B7:B${XL})`, v: sp.n}, 'Nuevos clientes a prospectar', {f: `COUNTIF(${F},"Nuevo cliente")+COUNTIF(${F},"Prospección")`, v: sp.nue}));
+  R.push(sum(a + 2, 'Visitas de seguimiento', {f: `COUNTIF(${F},"Seguimiento")`, v: sp.seg}, 'Km estimados', sp.km));
+  R.push(sum(a + 3, 'Visitas de cobro / entrega', {f: `COUNTIF(${F},"Cobro")+COUNTIF(${F},"Entrega")`, v: sp.cob}, 'Incidencias a resolver', {f: `COUNTIF(${F},"Incidencia")`, v: sp.inc}));
+  R.push(xR(a + 4, xHt(19.5, [[pl.obj, 120]]), [['A', 19, 'Objetivo principal de la semana'], ['B', 19], ...xFill('CDEFGH', 15, pl.obj)]));
+  R.push(xR(a + 6, 18, xFill('ABCDEFGH', 18, 'Comentarios del Delegado / Ajustes al plan')));
+  const hc = Math.max(19.5, xHt(19.5, [[pl.com, 150]]) / 3);
+  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGH', 21, j ? null : pl.com)));
+  R.push(xR(a + 11, 0, [['A', 4, 'Firma del Vendedor:'], ['E', 4, 'Firma del Delegado (Vº Bº):']]));
+  const m = ['A1:H1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:H${a}`, `A${a + 4}:B${a + 4}`, `C${a + 4}:H${a + 4}`, `A${a + 6}:H${a + 6}`, `A${a + 7}:H${a + 9}`];
+  for (let j = 1; j <= 3; j++) m.push(`A${a + j}:B${a + j}`, `C${a + j}:D${a + j}`, `E${a + j}:F${a + j}`, `G${a + j}:H${a + j}`);
+  return {last: a + 11, xml: xSheet({dim: `A1:H${a + 11}`, fz: 6, cols: [19.86, 23, 22, 11, 28, 16, 11, 32], rows: R, m, dv: [[F, TIPOS.join(',')], [`G7:G${XL}`, PRIOS.join(',')]]})};
+}
+function xInf(k, inf) {
+  const si = infSt(inf), rows = sortR(inf.rows), a = XL + 2, R = [];
+  R.push(xR(1, 25.5, xFill('ABCDEFGHIJ', 14, 'INFORME SEMANAL DE VISITAS — SEMANA EN VIGOR')));
+  R.push(xR(3, 34.5, [['A', 1, 'Vendedor:'], ['C', 15, V.vend], ['D', 15], ['E', 1, 'Zona / Ruta:'], ['G', 22, V.zona], ['H', 15]]));
+  R.push(xR(4, 25.5, [['A', 1, 'Semana (del/al):'], ['C', 15, `del ${dmy(k)} al ${dmy(addD(k, 6))}`], ['D', 15], ['E', 1, 'Fecha de entrega:'], ['G', 17, inf.ent ? xSer(inf.ent) : null], ['H', 15]]));
+  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Teléfono', 'Acción realizada', '¿Pedido?', 'Importe (€)', 'Próximas acciones', 'Potencial', 'Visita c/ Delegado', '¿Cliente nuevo?'].map((t, i) => ['ABCDEFGHIJ'[i], 2, t])));
+  for (let i = 0; i < MAXV; i++) {
+    const r = rows[i], n = 7 + i;
+    if (!r) { R.push(xR(n, 18, [['A', 10], ['B', 3], ['C', 3], ['D', 3], ['E', 5], ['F', 6], ['G', 3], ['H', 5], ['I', 5], ['J', 5]])); continue; }
+    R.push(xR(n, xHt(18, [[r.cli, 22], [r.acc, 26], [r.prox, 24]]), [['A', 10, xSer(r.d)], ['B', 3, r.cli], ['C', 3, r.tel], ['D', 3, r.acc], ['E', 5, r.ped || 'No'],
+      ['F', 6, r.ped === 'Sí' && r.imp != null ? +r.imp : null], ['G', 3, r.prox], ['H', 5, r.pot || 'No'], ['I', 5, r.del || 'No'], ['J', 5, r.nuevo ? 'Sí' : 'No']]));
+  }
+  R.push(xR(a, 18, xFill('ABCDEFGHIJ', 18, 'Resumen de control semanal')));
+  const sum = (n, l1, s1, v1, l2, v2) => xR(n, 18, [['A', 19, l1], ['B', 19], ['C', 19], ['D', s1, v1], ['E', 19, l2], ['F', 19], ['G', 19], ['H', 20, v2], ['I', 20]]);
+  R.push(sum(a + 1, 'Nº total de visitas', 7, {f: `COUNTA(B7:B${XL})`, v: si.n}, 'Nº de pedidos conseguidos', {f: `COUNTIF(E7:E${XL},"Sí")`, v: si.ped}));
+  R.push(sum(a + 2, 'Importe total de pedidos', 8, {f: `SUM(F7:F${XL})`, v: si.imp}, 'Nuevos clientes captados', {f: `COUNTIF(J7:J${XL},"Sí")`, v: si.nue}));
+  R.push(sum(a + 3, 'Km recorridos', 7, si.km, 'Clientes potenciales detectados', {f: `COUNTIFS(B7:B${XL},"<>",H7:H${XL},"Sí")`, v: si.pot}));
+  R.push(sum(a + 4, 'Clientes no localizados / cerrados', 7, si.noLoc, 'Incidencias o reclamaciones', si.inc));
+  R.push(xR(a + 6, 18, xFill('ABCDEFGHIJ', 18, 'Observaciones generales y plan para la semana siguiente')));
+  const hc = Math.max(19.5, xHt(19.5, [[inf.obs, 160]]) / 3);
+  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGHIJ', 21, j ? null : inf.obs)));
+  R.push(xR(a + 11, 0, [['A', 4, 'Firma del Vendedor:'], ['E', 4, 'Firma del Delegado:']]));
+  const m = ['A1:J1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:J${a}`, `A${a + 6}:J${a + 6}`, `A${a + 7}:J${a + 9}`];
+  for (let j = 1; j <= 4; j++) m.push(`A${a + j}:C${a + j}`, `E${a + j}:G${a + j}`, `H${a + j}:I${a + j}`);
+  return {last: a + 11, xml: xSheet({dim: `A1:J${a + 11}`, fz: 6, sel: true, cols: [19.86, 22, 14, 26, 12, 12, 24, 10, 12, 11], rows: R, m, dv: [[`E7:E${XL} H7:J${XL}`, 'Sí,No']]})};
+}
+function xCmp(k, pl, inf, ia) {
+  const sp = planSt(pl), si = infSt(inf), rows = sortR(pl.rows), L = 14 + MAXV, IS = `'${XSN[1]}'!`, R = [];
+  const vis = rows.filter(p => visited(p, inf)).length, ratio = (a, b) => a > 0 ? b / a : 0;
+  R.push(xR(1, 25.5, xFill('ABCDEF', 14, 'COMPARATIVA — PLAN vs REALIZADO')));
+  R.push(xR(3, 18, [['A', 1, 'Vendedor:'], ['B', 1], ['C', 15, {f: IS + 'C3', v: V.vend}], ['D', 15], ['E', 1, 'Semana:'], ['F', 3, {f: IS + 'C4', v: `del ${dmy(k)} al ${dmy(addD(k, 6))}`}]]));
+  R.push(xR(5, 18, xFill('ABCDEF', 18, 'Indicadores de la semana')));
+  R.push(xR(6, 19.5, [['A', 23, 'Indicador'], ['B', 23], ['C', 2, 'Previsto'], ['D', 2, 'Realizado'], ['E', 23, 'Cumplimiento'], ['F', 23]]));
+  const ind = (n, l, c, d, e, es) => xR(n, 18, [['A', 24, l], ['B', 24], ['C', 5, c], ['D', 5, d], ['E', es || 25, e], ['F', es || 25]]);
+  const C = `C15:C${L}`;
+  R.push(ind(7, 'Nº de visitas', {f: `COUNTA(B15:B${L})`, v: sp.n}, {f: IS + 'D' + (ia + 1), v: si.n}, {f: 'IFERROR(D7/C7,0)', v: ratio(sp.n, si.n)}));
+  R.push(ind(8, 'Nuevos clientes', {f: `COUNTIF(${C},"Nuevo cliente")+COUNTIF(${C},"Prospección")`, v: sp.nue}, {f: IS + 'H' + (ia + 2), v: si.nue}, {f: 'IFERROR(D8/C8,0)', v: ratio(sp.nue, si.nue)}));
+  R.push(ind(9, 'Km', sp.km, {f: IS + 'D' + (ia + 3), v: si.km}, {f: 'IFERROR(D9/C9,0)', v: ratio(sp.km, si.km)}));
+  R.push(ind(10, 'Incidencias', {f: `COUNTIF(${C},"Incidencia")`, v: sp.inc}, {f: IS + 'H' + (ia + 4), v: si.inc}, {f: 'D10-C10', v: si.inc - sp.inc}, 20));
+  R.push(xR(13, 18, xFill('ABCDEF', 18, 'Seguimiento cliente a cliente (plan de esta semana)')));
+  R.push(xR(14, 24, ['Día', 'Cliente planificado', 'Tipo de visita', 'Prioridad', '¿Visitado?', 'Notas'].map((t, i) => ['ABCDEF'[i], 2, t])));
+  for (let i = 0; i < MAXV; i++) {
+    const r = rows[i] || {}, n = 15 + i;
+    R.push(xR(n, xHt(19.5, [[r.cli, 26]]), [['A', 12, r.d ? xSer(r.d) : null], ['B', 3, r.cli], ['C', 3, r.tipo], ['D', 5, r.prio],
+      ['E', 5, {f: `IF(B${n}="","",IF(COUNTIF(${IS}$B$7:$B$${XL},B${n})>0,"Sí","No"))`, v: r.cli ? (visited(r, inf) ? 'Sí' : 'No') : ''}], ['F', 3]]));
+  }
+  const z = L + 2;
+  R.push(xR(z, 18, [['A', 19, 'Visitas planificadas realmente visitadas'], ['B', 19], ['C', 19], ['D', 19], ['E', 20, {f: `COUNTIF(E15:E${L},"Sí")&" / "&COUNTA(B15:B${L})`, v: `${vis} / ${sp.n}`}], ['F', 20]]));
+  const m = ['A1:F1', 'A3:B3', 'C3:D3', 'A5:F5', 'A6:B6', 'E6:F6', 'A13:F13', `A${z}:D${z}`, `E${z}:F${z}`];
+  for (let j = 7; j <= 10; j++) m.push(`A${j}:B${j}`, `E${j}:F${j}`);
+  return {last: z, xml: xSheet({dim: `A1:F${z}`, fz: 14, cols: [12, 26, 16, 14, 14, 16], rows: R, m, dv: [[C, TIPOS.join(',')], [`D15:D${L}`, PRIOS.join(',')]]})};
+}
+let crcT = null;
+function zipStore(files) {
+  if (!crcT) { crcT = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; crcT[n] = c >>> 0; } }
+  const crc = d => { let c = 0xFFFFFFFF; for (let i = 0; i < d.length; i++) c = crcT[(c ^ d[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const te = new TextEncoder(), parts = [], cen = [];
+  let off = 0;
+  files.forEach(([name, txt]) => {
+    const nm = te.encode(name), d = te.encode(txt), c = crc(d);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(12, 0x21, true);
+    h.setUint32(14, c, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, nm.length, true);
+    parts.push(new Uint8Array(h.buffer), nm, d);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(14, 0x21, true);
+    ch.setUint32(16, c, true); ch.setUint32(20, d.length, true); ch.setUint32(24, d.length, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
+    cen.push(new Uint8Array(ch.buffer), nm);
+    off += 30 + nm.length + d.length;
+  });
+  const clen = cen.reduce((s, x) => s + x.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, clen, true); e.setUint32(16, off, true);
+  const all = [...parts, ...cen, new Uint8Array(e.buffer)], out = new Uint8Array(all.reduce((s, x) => s + x.length, 0));
+  let p = 0; all.forEach(x => { out.set(x, p); p += x.length; });
+  return out;
+}
+function buildVisXlsx(k) {
+  syncOrders(k);
+  const w = wk(k), next = wk(addD(k, 7));
+  const s1 = xPlan(addD(k, 7), next.plan), s2 = xInf(k, w.inf), s3 = xCmp(k, w.plan, w.inf, XL + 2);
+  const pa = [`'${XSN[0]}'!$A$1:$H$${s1.last}`, `'${XSN[1]}'!$A$1:$J$${s2.last}`, `'${XSN[2]}'!$A$1:$F$${s3.last}`];
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/', CT = 'application/vnd.openxmlformats-officedocument.';
+  return zipStore([
+    ['[Content_Types].xml', X + `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${CT}spreadsheetml.sheet.main+xml"/>${[1, 2, 3].map(i => `<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="${CT}spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="${CT}spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="${CT}theme+xml"/></Types>`],
+    ['_rels/.rels', X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RT}officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', X + `<workbook xmlns="${XNS}" xmlns:r="${XNSR}"><fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="24334"/><bookViews><workbookView activeTab="1"/></bookViews><sheets>${XSN.map((n, i) => `<sheet name="${xe(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><definedNames>${pa.map((r, i) => `<definedName name="_xlnm.Print_Area" localSheetId="${i}">${xe(r)}</definedName>`).join('')}</definedNames><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+    ['xl/_rels/workbook.xml.rels', X + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${[1, 2, 3].map(i => `<Relationship Id="rId${i}" Type="${RT}worksheet" Target="worksheets/sheet${i}.xml"/>`).join('')}<Relationship Id="rId4" Type="${RT}styles" Target="styles.xml"/><Relationship Id="rId5" Type="${RT}theme" Target="theme/theme1.xml"/></Relationships>`],
+    ['xl/worksheets/sheet1.xml', s1.xml], ['xl/worksheets/sheet2.xml', s2.xml], ['xl/worksheets/sheet3.xml', s3.xml],
+    ['xl/styles.xml', XSTY], ['xl/theme/theme1.xml', XTHEME]
+  ]);
+}
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+$('vExp').addEventListener('click', () => {
+  let u8;
+  try { u8 = buildVisXlsx(visWk); } catch (err) { toast('No se ha podido crear el Excel: ' + err.message); return; }
+  const name = 'Informe visitas ' + dmy(visWk).replace(/\//g, '-') + '.xlsx';
+  const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (NATIVE && NATIVE.shareFile) { NATIVE.shareFile(b64(u8), name, mime); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([u8], {type: mime})); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('Excel descargado');
+});
+
 // ---------- importación desde Excel ----------
 async function readBook(file) {
   if (typeof XLSX === 'undefined') throw new Error('No se ha cargado el lector de Excel');
@@ -841,11 +1286,12 @@ function renderView() {
   else if (view === 'Ped') { renderPed(); renderBar(); }
   else if (view === 'Hist') renderHist();
   else if (view === 'Est') renderEst();
+  else if (view === 'Vis') renderVis();
   else renderDat();
 }
 function show(v) {
   view = v;
-  ['Cat', 'Ped', 'Hist', 'Est', 'Dat'].forEach(x => { $('v' + x).hidden = x !== v; });
+  ['Cat', 'Ped', 'Hist', 'Est', 'Vis', 'Dat'].forEach(x => { $('v' + x).hidden = x !== v; });
   if (v === 'Dat') $('impMsg').hidden = true;
   renderView(); window.scrollTo(0, 0);
 }
@@ -870,12 +1316,14 @@ $('goPed').addEventListener('click', () => show('Ped'));
 $('goHist').addEventListener('click', () => { openCli = null; openOrd = null; show('Hist'); });
 $('goDat').addEventListener('click', () => show('Dat'));
 $('goEst').addEventListener('click', () => { estCli = ''; estYear = null; show('Est'); });
+$('goVis').addEventListener('click', () => { visWk = monOf(new Date()); visTab = 'inf'; show('Vis'); });
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show('Cat')));
 
 // Dentro de la app Android: abrir WhatsApp directamente y botón atrás
 const NATIVE = window.AndroidApp || null;
 window.appBack = () => {
   if (!$('ov').hidden) { closeModal(); return true; }
+  if (!$('vov').hidden) { closeVis(); return true; }
   if (view !== 'Cat') { show('Cat'); return true; }
   return false;
 };
