@@ -3,7 +3,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/ic_auro"
+        android:roundIcon="@drawable/ic_auro"
         android:label="@string/app_name"
         android:theme="@style/AppTheme">
         <activity
