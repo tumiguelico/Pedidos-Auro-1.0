@@ -7,11 +7,12 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.tarifa.pedidos"
+        // Id nuevo: se instala aunque haya otra version vieja firmada con otra clave
+        applicationId "com.tarifa.pedidos.auro"
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName "2.2"
+        versionCode 5
+        versionName "2.3"
     }
 
     // Firma fija: asi las versiones nuevas se instalan encima de la anterior
