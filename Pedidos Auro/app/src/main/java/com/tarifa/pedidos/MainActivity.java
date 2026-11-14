@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -16,6 +17,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class MainActivity extends Activity {
 
@@ -133,7 +138,47 @@ public class MainActivity extends Activity {
         }
     }
 
+    // Guarda el archivo (por ejemplo el Excel de visitas) en la caché y abre el selector para enviarlo
+    private void shareArchivo(String base64, String name, String mime) {
+        try {
+            String safe = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+            File dir = new File(getCacheDir(), ArchivosProvider.DIR);
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                throw new IOException("No se puede crear la carpeta");
+            }
+            File f = new File(dir, safe);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(Base64.decode(base64, Base64.DEFAULT));
+            }
+            Uri uri = new Uri.Builder().scheme("content")
+                    .authority(getPackageName() + ArchivosProvider.SUFIJO).appendPath(safe).build();
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType(mime);
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            send.putExtra(Intent.EXTRA_SUBJECT, safe);
+            send.setClipData(ClipData.newRawUri(safe, uri));
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent chooser = Intent.createChooser(send, "Enviar Excel con...");
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (!open(chooser)) {
+                Toast.makeText(this, "No hay ninguna app para enviar el archivo", Toast.LENGTH_LONG).show();
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            Toast.makeText(this, "No se ha podido preparar el archivo", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private class Bridge {
+        @JavascriptInterface
+        public void shareFile(final String base64, final String name, final String mime) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    shareArchivo(base64, name, mime);
+                }
+            });
+        }
+
         @JavascriptInterface
         public void share(final String text) {
             runOnUiThread(new Runnable() {
