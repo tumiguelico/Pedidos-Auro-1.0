@@ -176,6 +176,21 @@ header{border-bottom:3px solid var(--gold)}
 .lda{display:flex;flex-direction:column;gap:6px;flex:none}
 .ld-cli{background:var(--accent-bg);border:1px solid var(--gold);border-radius:12px;padding:10px;margin-top:6px}
 .ld-desc b{color:var(--soft);text-decoration:line-through}
+.hoy{border-top:1px solid var(--line);padding:10px 0 0;display:flex;flex-direction:column;gap:8px}
+.hoy.hv{background:#eef5e6;border:1px solid #b9d49a;border-radius:12px;padding:10px;margin-top:6px}
+.hoy.hc{background:#f9ebe8;border:1px solid #e6bdb7;border-radius:12px;padding:10px;margin-top:6px}
+.hh2{display:flex;gap:12px;align-items:flex-start}
+.hh2>b{font-size:15px;min-width:48px;color:var(--brand);font-variant-numeric:tabular-nums}
+.hh2 div{flex:1;min-width:0}
+.hh2 div b{display:block;font-size:15px}
+.hh2 span{display:block;font-size:12px;color:var(--soft)}
+.hh2 .hlast{color:var(--accent);font-style:italic}
+.hh2 .hst.ok{color:#2f6b1f;font-weight:700}
+.hh2 .hst.ko{color:var(--danger);font-weight:700}
+.hb2{display:flex;gap:6px;flex-wrap:wrap}
+.hist{background:var(--accent-bg);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.hist div span{font-weight:700;color:var(--accent);margin-right:4px}
+.vr span.vcom{color:var(--ink);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -261,7 +276,7 @@ header{border-bottom:3px solid var(--gold)}
   <header><div class="h-row"><button class="hb" data-back>‹ Tarifa</button><h1>Visitas<small id="visSub"></small></h1><button class="hb" id="vExp">Exportar Excel</button></div></header>
   <div class="pane">
     <div class="wk"><button id="wPrev" aria-label="Semana anterior">‹</button><b id="wLbl"></b><button id="wNext" aria-label="Semana siguiente">›</button></div>
-    <div class="seg" id="vSeg"><button data-s="inf">Informe semanal</button><button data-s="plan">Plan semana siguiente</button><button data-s="cmp">Plan vs realizado</button><button data-s="lead">Base de datos</button></div>
+    <div class="seg" id="vSeg"><button data-s="hoy">Hoy</button><button data-s="inf">Informe semanal</button><button data-s="plan">Plan semana siguiente</button><button data-s="cmp">Plan vs realizado</button><button data-s="lead">Base de datos</button></div>
     <div class="pane" id="vBody" style="padding:0"></div>
   </div>
 </section>
@@ -754,7 +769,7 @@ const inCL = name => CL.some(x => cliKey(x.n) === cliKey(name));
 function wk(k) {
   const w = V.weeks[k] || (V.weeks[k] = {});
   w.plan = Object.assign({rows: [], obj: '', com: '', km: '', ent: ''}, w.plan);
-  w.inf = Object.assign({rows: [], km: '', noLoc: '', incid: '', obs: '', ent: ''}, w.inf);
+  w.inf = Object.assign({rows: [], km: '', noLoc: '', incid: '', obs: '', ent: '', cerr: []}, w.inf);
   return w;
 }
 function saveV() {
@@ -762,7 +777,7 @@ function saveV() {
   const out = Object.assign({}, V, {weeks: {}});
   for (const k in V.weeks) {
     const w = V.weeks[k], p = w.plan || {}, i = w.inf || {};
-    if ((p.rows || []).length || (i.rows || []).length || [p.obj, p.com, p.km, p.ent, i.km, i.noLoc, i.incid, i.obs, i.ent].some(x => x)) out.weeks[k] = w;
+    if ((p.rows || []).length || (i.rows || []).length || (i.cerr || []).length || [p.obj, p.com, p.km, p.ent, i.km, i.noLoc, i.incid, i.obs, i.ent].some(x => x)) out.weeks[k] = w;
   }
   return store(VK, out);
 }
@@ -770,8 +785,21 @@ const sortR = rows => rows.slice().sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1
 function infSt(inf) {
   const r = inf.rows;
   return {n: r.length, ped: r.filter(x => x.ped === 'Sí').length, imp: r2(r.reduce((s, x) => s + (x.ped === 'Sí' ? +x.imp || 0 : 0), 0)),
-    nue: r.filter(x => x.nuevo).length, pot: r.filter(x => x.pot === 'Sí').length, km: nv(inf.km), noLoc: nv(inf.noLoc), inc: nv(inf.incid)};
+    nue: r.filter(x => x.nuevo).length, pot: r.filter(x => x.pot === 'Sí').length, km: nv(inf.km), noLoc: nv(inf.noLoc) + (inf.cerr || []).length, inc: nv(inf.incid)};
 }
+// visitas anteriores de un cliente (todas las semanas), la más reciente primero
+function cliHist(name, skipId) {
+  const k = cliKey(name), out = [];
+  if (!k || k === '(sin cliente)') return out;
+  for (const wkey in V.weeks) {
+    const i = (V.weeks[wkey] || {}).inf || {};
+    (i.rows || []).forEach(r => { if (r.id !== skipId && cliKey(r.cli) === k) out.push(r); });
+    (i.cerr || []).forEach(c => { if (cliKey(c.cli) === k) out.push({d: c.d, cerr: true}); });
+  }
+  return out.sort((a, b) => a.d < b.d ? 1 : a.d > b.d ? -1 : 0);
+}
+const histTxt = x => x.cerr ? 'No localizado / cerrado' : [x.acc, x.ped === 'Sí' ? 'pedido ' + eur(+x.imp || 0) : '', x.com, x.prox && 'Próximo: ' + x.prox].filter(Boolean).join(' · ');
+const isCerr = (inf, name, d) => (inf.cerr || []).some(c => cliKey(c.cli) === cliKey(name) && (!d || c.d === d));
 function planSt(pl) {
   const c = t => pl.rows.filter(x => x.tipo === t).length;
   return {n: pl.rows.length, nue: c('Nuevo cliente') + c('Prospección'), seg: c('Seguimiento'), cob: c('Cobro') + c('Entrega'), inc: c('Incidencia'), km: nv(pl.km)};
@@ -804,7 +832,7 @@ function syncOrders(k) {
   if (ch) saveV();
 }
 
-let visWk = monOf(new Date()), visTab = 'inf', VF = null;
+let visWk = monOf(new Date()), visTab = 'hoy', VF = null;
 const kpiV = (t, v, sub, main) => `<div class="kpi${main ? ' main' : ''}"><span>${esc(t)}</span><b>${v}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 const fldV = (lbl, k, val, type, extra) => `<div class="field"><label>${esc(lbl)}</label><input data-k="${k}" type="${type || 'text'}" value="${esc(val)}" autocomplete="off"${extra || ''}></div>`;
 const txtV = (lbl, k, val) => `<div class="field"><label>${esc(lbl)}</label><textarea data-k="${k}">${esc(val)}</textarea></div>`;
@@ -817,7 +845,7 @@ function mapsBtns(d, rows) {
   return Array.from({length: parts}, (_, i) => `<button class="mbtn" data-map="${d}|${i}">${parts > 1 ? 'Ruta ' + (i + 1) : 'Ruta en Maps'}</button>`).join('');
 }
 function openMaps(d, part) {
-  const rows = sortR(wk(addD(visWk, 7)).plan.rows.filter(r => r.d === d)).map(stopOf);
+  const rows = sortR(wk(monOf(pD(d))).plan.rows.filter(r => r.d === d)).map(stopOf);
   const a = part * (MAPS_MAX - 1), seg = rows.slice(a, a + MAPS_MAX);
   if (!seg.length) return;
   const e = encodeURIComponent;
@@ -843,13 +871,26 @@ function rowsV(rows, kind) {
     if (kind === 'inf') {
       const t = [r.acc, r.prox && 'Próximo: ' + r.prox].filter(Boolean).join(' · ');
       const f = [r.nuevo && 'Cliente nuevo', r.pot === 'Sí' && 'Potencial', r.del === 'Sí' && 'Con delegado'].filter(Boolean).join(' · ');
-      h += `<button class="vr${star ? ' vnew' : ''}" data-ri="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${star}${t ? `<span>${esc(t)}</span>` : ''}${f ? `<span class="vf">${esc(f)}</span>` : ''}</div><strong>${r.ped === 'Sí' ? eur(+r.imp || 0) : '<small>Sin pedido</small>'}</strong></button>`;
+      h += `<button class="vr${star ? ' vnew' : ''}" data-ri="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${star}${t ? `<span>${esc(t)}</span>` : ''}${r.com ? `<span class="vcom">${esc(r.com)}</span>` : ''}${f ? `<span class="vf">${esc(f)}</span>` : ''}</div><strong>${r.ped === 'Sí' ? eur(+r.imp || 0) : '<small>Sin pedido</small>'}</strong></button>`;
     } else {
       const t = [r.hora, r.tipo, r.prio && 'Prioridad ' + r.prio.toLowerCase(), r.dir].filter(Boolean).join(' · ');
       h += `<button class="vr${star ? ' vnew' : ''}" data-rp="${esc(r.id)}"><div><b>${esc(r.cli)}</b>${star}${t ? `<span>${esc(t)}</span>` : ''}${r.obj ? `<span>${esc(r.obj)}</span>` : ''}</div><strong>›</strong></button>`;
     }
   });
   return h;
+}
+function hoyCard(p, d, s, today) {
+  const tel = telOf(p.cli), last = cliHist(p.cli, d && d.id).find(x => x.d < today || (x.d === today && x.cerr && !s));
+  const st = d ? `<span class="hst ok">✓ Visitado${d.ped === 'Sí' ? ' · pedido ' + eur(+d.imp || 0) : ''}</span>${d.com ? `<span>${esc(d.com)}</span>` : ''}`
+    : s ? '<span class="hst ko">✕ No localizado / cerrado</span>' : '';
+  const main = d ? `<button class="btn ghost sm" data-ri="${esc(d.id)}">Ver o editar</button>`
+    : s ? `<button class="btn ghost sm" data-hu="${esc(p.id)}">Deshacer</button>`
+    : `<button class="btn sm" data-pv="${esc(p.id)}">Visitado</button><button class="btn del sm" data-hx="${esc(p.id)}">No visitado / cerrado</button>`;
+  return `<div class="hoy${d ? ' hv' : s ? ' hc' : ''}"><div class="hh2"><b>${esc(p.hora || '—')}</b><div><b>${esc(p.cli)}</b>`
+    + `<span>${esc([p.tipo, p.dir].filter(Boolean).join(' · '))}</span>${p.obj ? `<span>${esc(p.obj)}</span>` : ''}`
+    + `${last ? `<span class="hlast">Última visita ${esc(dm(last.d))}: ${esc(histTxt(last) || '—')}</span>` : ''}${st}</div></div>`
+    + `<div class="hb2">${main}${tel ? `<button class="btn ghost sm" data-hc="tel" data-t="${esc(tel)}">Llamar</button><button class="btn ghost sm" data-hc="wa" data-t="${esc(tel)}">WhatsApp</button>` : ''}`
+    + `<button class="btn ghost sm" data-hm="${esc(p.id)}">Maps</button></div></div>`;
 }
 function renderVis() {
   const k = visWk, nk = addD(k, 7);
@@ -859,7 +900,24 @@ function renderVis() {
   $('visSub').textContent = `${si.n} ${si.n === 1 ? 'visita' : 'visitas'} · ${eur(si.imp)}`;
   $('vSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === visTab));
   let h = '';
-  if (visTab === 'inf') {
+  $('wLbl').parentElement.hidden = visTab === 'hoy';
+  if (visTab === 'hoy') {
+    const today = isoD(new Date()), tw = wk(monOf(new Date()));
+    if (!tw.inf.cerr) tw.inf.cerr = [];
+    const plan = sortR(tw.plan.rows.filter(r => r.d === today));
+    const infT = tw.inf.rows.filter(r => r.d === today);
+    const done = p => infT.find(r => cliKey(r.cli) === cliKey(p.cli));
+    const shut = p => isCerr(tw.inf, p.cli, today);
+    const extra = infT.filter(r => !plan.some(p => cliKey(p.cli) === cliKey(r.cli)));
+    const nDone = plan.filter(p => done(p)).length, nShut = plan.filter(p => !done(p) && shut(p)).length;
+    h = `<p class="vnote">Hoy es <b>${DIAS_L[dow(today)]} ${dmy(today)}</b>. Al terminar cada visita pulsa «Visitado» y escribe los comentarios; pasa sola al informe semanal.</p>
+    <div class="kpis">${kpiV('Previstas hoy', plan.length, nPed(infT.filter(r => r.ped === 'Sí').length), true)}${kpiV('Visitadas', nDone, plan.length ? 'de ' + plan.length : '')}${kpiV('No localizadas', nShut, 'o cerradas')}</div>
+    <div class="box"><div class="bh"><h2>Visitas de hoy</h2><div class="vd">${mapsBtns(today, plan)}</div></div>
+    ${plan.length ? plan.map(p => hoyCard(p, done(p), shut(p), today)).join('')
+      : '<p>No tienes visitas planificadas para hoy. Se preparan en «Plan semana siguiente», desde la base de datos o importando tu Excel de plan.</p>'}
+    <button class="btn full" data-v="addInf">+ Visita no planificada</button></div>
+    ${extra.length ? `<div class="box"><h2>Otras visitas de hoy</h2>${rowsV(extra, 'inf')}</div>` : ''}`;
+  } else if (visTab === 'inf') {
     const pend = sortR(w.plan.rows.filter(p => !visited(p, inf)));
     h = `<div class="kpis">${kpiV('Importe pedidos', eur(si.imp), nPed(si.ped), true)}${kpiV('Visitas', si.n, 'máximo ' + MAXV)}${kpiV('Nuevos clientes', si.nue, 'captados')}${kpiV('Potenciales', si.pot, 'detectados')}${kpiV('Km', num(si.km), 'recorridos')}${kpiV('Incidencias', num(si.inc), 'o reclamaciones')}</div>
     <div class="box"><div class="bh"><h2>Visitas realizadas</h2><span class="meta">${si.n} / ${MAXV}</span></div>
@@ -867,7 +925,8 @@ function renderVis() {
     ${rowsV(inf.rows, 'inf')}
     <button class="btn full${si.n >= MAXV ? ' off' : ''}" data-v="addInf">+ Añadir visita</button>
     <p>Los pedidos que guardas en la app se apuntan solos aquí, en su día y cliente («¿Pedido?» e importe).</p></div>
-    <div class="box"><h2>Resumen de control</h2><div class="grid2">${fldV('Km recorridos', 'inf.km', inf.km, 'text', ' inputmode="decimal"')}${fldV('Clientes no localizados / cerrados', 'inf.noLoc', inf.noLoc, 'text', ' inputmode="numeric"')}${fldV('Incidencias o reclamaciones', 'inf.incid', inf.incid, 'text', ' inputmode="numeric"')}${fldV('Fecha de entrega', 'inf.ent', inf.ent, 'date')}</div>
+    <div class="box"><h2>Resumen de control</h2><div class="grid2">${fldV('Km recorridos', 'inf.km', inf.km, 'text', ' inputmode="decimal"')}${fldV((inf.cerr || []).length ? 'Otros no localizados / cerrados' : 'Clientes no localizados / cerrados', 'inf.noLoc', inf.noLoc, 'text', ' inputmode="numeric"')}${fldV('Incidencias o reclamaciones', 'inf.incid', inf.incid, 'text', ' inputmode="numeric"')}${fldV('Fecha de entrega', 'inf.ent', inf.ent, 'date')}</div>
+    ${(inf.cerr || []).length ? `<p>Marcados en «Hoy» como no localizados o cerrados (${inf.cerr.length}): ${esc(sortR(inf.cerr).map(c => dm(c.d) + ' ' + c.cli).join(', '))}. Total en el informe: ${num(si.noLoc)}.</p>` : ''}
     ${txtV('Observaciones generales y plan para la semana siguiente', 'inf.obs', inf.obs)}</div>
     <div class="box"><h2>Datos del informe</h2><div class="grid2">${fldV('Vendedor', 'vend', V.vend)}${fldV('Zona / Ruta', 'zona', V.zona)}</div></div>`;
   } else if (visTab === 'plan') {
@@ -911,7 +970,7 @@ function renderVis() {
     <tr><td>Km</td><td>${num(sp.km)}</td><td>${num(si.km)}</td><td>${pc(sp.km, si.km)}</td></tr>
     <tr><td>Incidencias</td><td>${sp.inc}</td><td>${num(si.inc)}</td><td>${(dif > 0 ? '+' : '') + num(dif)}</td></tr></table></div>
     <div class="box"><div class="bh"><h2>Seguimiento cliente a cliente</h2><span class="meta">${vis} / ${sp.n} visitadas</span></div>
-    ${pl.rows.length ? sortR(pl.rows).map(p => { const ok = visited(p, inf); return `<div class="tl"><div><b>${esc(p.cli)}</b><span>${esc([dayLbl(p.d), p.tipo, p.prio].filter(Boolean).join(' · '))}</span></div><span class="${ok ? 'vok' : 'vko'}">${ok ? '✓ Visitado' : '✕ No visitado'}</span></div>`; }).join('')
+    ${pl.rows.length ? sortR(pl.rows).map(p => { const ok = visited(p, inf); return `<div class="tl"><div><b>${esc(p.cli)}</b><span>${esc([dayLbl(p.d), p.tipo, p.prio].filter(Boolean).join(' · '))}</span></div><span class="${ok ? 'vok' : 'vko'}">${ok ? '✓ Visitado' : isCerr(inf, p.cli) ? '✕ Cerrado / no localizado' : '✕ No visitado'}</span></div>`; }).join('')
       : '<p>No hay plan para esta semana. Se prepara en «Plan semana siguiente» durante la semana anterior.</p>'}</div>`;
   }
   $('vBody').innerHTML = h;
@@ -947,6 +1006,19 @@ $('vBody').addEventListener('click', e => {
   if (mb) { const [d, p] = mb.dataset.map.split('|'); openMaps(d, +p); return; }
   const la = e.target.closest('[data-la]');
   if (la) { leadAct(la.dataset.la, la.dataset.id); return; }
+  // pantalla Hoy: no localizado, deshacer, llamar, WhatsApp y Maps
+  const hb = e.target.closest('[data-hx],[data-hu],[data-hc],[data-hm]');
+  if (hb) {
+    const today = isoD(new Date()), tw = wk(monOf(new Date()));
+    if (!tw.inf.cerr) tw.inf.cerr = [];
+    const p = tw.plan.rows.find(x => x.id === (hb.dataset.hx || hb.dataset.hu || hb.dataset.hm));
+    if (hb.dataset.hc) { const t = hb.dataset.t; openExt(hb.dataset.hc === 'tel' ? 'tel:' + t.replace(/[^\d+]/g, '') : 'https://wa.me/' + waNum(t)); return; }
+    if (!p) return;
+    if (hb.dataset.hm) { openExt('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(stopOf(p))); return; }
+    if (hb.dataset.hx) { if (!isCerr(tw.inf, p.cli, today)) tw.inf.cerr.push({id: uid(), d: today, cli: p.cli}); toast(p.cli + ': no localizado / cerrado'); }
+    else tw.inf.cerr = tw.inf.cerr.filter(c => !(c.d === today && cliKey(c.cli) === cliKey(p.cli)));
+    saveV(); renderVis(); return;
+  }
   const b = e.target.closest('[data-v],[data-ri],[data-rp],[data-pv]'); if (!b) return;
   const v = b.dataset.v;
   if (v === 'fromLeads') { visTab = 'lead'; ldF = 'act'; renderVis(); window.scrollTo(0, 0); return; }
@@ -961,7 +1033,7 @@ $('vBody').addEventListener('click', e => {
   const p = wk(visWk).plan.rows.find(x => x.id === b.dataset.pv); if (!p) return;
   openVis('inf', null, {d: p.d, cli: p.cli, tel: telOf(p.cli), acc: p.tipo === 'Nuevo cliente' ? 'Prospección' : p.tipo || '', nuevo: p.tipo === 'Nuevo cliente' && !inCL(p.cli)});
 });
-$('vSeg').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; visTab = b.dataset.s; planMsg = ''; ldMsg = ''; renderVis(); window.scrollTo(0, 0); });
+$('vSeg').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; visTab = b.dataset.s; planMsg = ''; ldMsg = ''; if (visTab === 'hoy') visWk = monOf(new Date()); renderVis(); window.scrollTo(0, 0); });
 $('wPrev').addEventListener('click', () => { visWk = addD(visWk, -7); renderVis(); });
 $('wNext').addEventListener('click', () => { visWk = addD(visWk, 7); renderVis(); });
 
@@ -972,7 +1044,7 @@ function openVis(kind, row, pre) {
   if (!row && list.length >= MAXV) { toast('Como máximo ' + MAXV + ' visitas por semana'); return; }
   const today = isoD(new Date()), d0 = today >= k && today <= addD(k, 6) ? today : k;
   const r = Object.assign(kind === 'inf'
-    ? {d: d0, cli: '', tel: '', acc: '', ped: 'No', imp: null, prox: '', pot: 'No', del: 'No', nuevo: false, oa: true}
+    ? {d: d0, cli: '', tel: '', acc: '', com: '', ped: 'No', imp: null, prox: '', pot: 'No', del: 'No', nuevo: false, oa: true}
     : {d: d0, cli: '', dir: '', addr: '', hora: '', obj: '', tipo: 'Seguimiento', prio: 'Media', obs: ''}, row || {}, pre || {});
   VF = {kind, k, list, row, r, ped0: r.ped, imp0: r.imp, nTouched: !!row, del: false};
   const sel = (id, opts, v) => `<select id="${id}">${opts.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -980,11 +1052,12 @@ function openVis(kind, row, pre) {
   let h = `<h2>${row ? 'Modificar visita' : kind === 'inf' ? 'Nueva visita' : 'Nueva visita planificada'}</h2><p>Semana ${esc(wkLbl(k))}</p>
     <div class="field"><label for="vfD">Día</label><select id="vfD">${days.map(d => `<option value="${d}"${d === r.d ? ' selected' : ''}>${esc(DIAS_L[dow(d)] + ' ' + dmy(d))}</option>`).join('')}</select></div>
     <div class="field"><label for="vfC">Cliente</label><input id="vfC" value="${esc(r.cli)}" placeholder="Escribe para buscar en clientes y base de datos" autocomplete="off"><div class="sug" id="vfS" hidden></div></div>
-    <div class="ct" id="vfCt"></div>`;
+    <div class="ct" id="vfCt"></div><div id="vfHist"></div>`;
   if (kind === 'inf') h += `
     <label class="chk"><input type="checkbox" id="vfN"${r.nuevo ? ' checked' : ''}> Cliente nuevo (se guarda también en la base de clientes)</label>
     <div class="field"><label for="vfT">Teléfono</label><input id="vfT" type="tel" inputmode="tel" value="${esc(r.tel)}" autocomplete="off"></div>
     <div class="field"><label for="vfA">Acción realizada</label><input id="vfA" list="vfAL" value="${esc(r.acc)}" placeholder="Prospección, seguimiento, cobro…" autocomplete="off"><datalist id="vfAL">${ACCS.map(a => `<option value="${esc(a)}">`).join('')}</datalist></div>
+    <div class="field"><label for="vfCo">Comentarios de la visita</label><textarea id="vfCo" placeholder="Qué habéis hablado, objeciones, productos que le interesan…">${esc(r.com || '')}</textarea></div>
     <div class="grid2"><div class="field"><label for="vfP">¿Pedido?</label>${sel('vfP', ['No', 'Sí'], r.ped)}</div><div class="field"><label for="vfI">Importe (€)</label><input id="vfI" inputmode="decimal" value="${r.imp != null ? esc(String(r.imp).replace('.', ',')) : ''}" autocomplete="off"></div></div>
     <div class="field"><label for="vfX">Próximas acciones</label><input id="vfX" value="${esc(r.prox)}" autocomplete="off"></div>
     <div class="grid2"><div class="field"><label for="vfO">Potencial</label>${sel('vfO', ['No', 'Sí'], r.pot)}</div><div class="field"><label for="vfL">Visita con delegado</label>${sel('vfL', ['No', 'Sí'], r.del)}</div></div>
@@ -1003,9 +1076,13 @@ function openVis(kind, row, pre) {
 function updCt() {
   if (!VF) return;
   const cli = $('vfC').value.trim(), tel = VF.kind === 'inf' ? $('vfT').value.trim() || telOf(cli) : telOf(cli);
-  const l = leadOf(cli), dest = VF.kind === 'plan' ? (cli || $('vfAd').value.trim() ? stopOf({cli, addr: $('vfAd').value, dir: $('vfR').value}) : '') : (l ? stopOf({cli: l.n, addr: l.dir, dir: l.loc}) : '');
+  const l = leadOf(cli), pr = cli && wk(VF.k).plan.rows.find(r => cliKey(r.cli) === cliKey(cli));
+  const dest = VF.kind === 'plan' ? (cli || $('vfAd').value.trim() ? stopOf({cli, addr: $('vfAd').value, dir: $('vfR').value}) : '')
+    : pr ? stopOf(pr) : l ? stopOf({cli: l.n, addr: l.dir, dir: l.loc}) : '';
   VF.ct = {tel, dest};
-  $('vfCt').innerHTML = (tel ? `<button type="button" class="btn ghost sm" data-ct="tel">Llamar</button><button type="button" class="btn ghost sm" data-ct="wa">WhatsApp</button>` : '')
+  const hs = cliHist(cli, VF.row && VF.row.id).slice(0, 6);
+  $('vfHist').innerHTML = hs.length ? `<div class="hist"><b>Visitas anteriores a ${esc(cli)}</b>${hs.map(x => `<div><span>${esc(dmy(x.d))}</span> ${esc(histTxt(x) || 'Sin comentarios')}</div>`).join('')}</div>` : '';
+  $('vfCt').innerHTML = (tel ?`<button type="button" class="btn ghost sm" data-ct="tel">Llamar</button><button type="button" class="btn ghost sm" data-ct="wa">WhatsApp</button>` : '')
     + (dest ? `<button type="button" class="btn ghost sm" data-ct="map">Cómo llegar</button>` : '');
 }
 // clientes de la base + leads que aún no son clientes
@@ -1036,7 +1113,9 @@ function saveVis() {
     if (t && (imp == null || imp < 0)) { toast('Escribe un importe válido'); return; }
     const ped = $('vfP').value, impV = imp == null ? null : r2(imp);
     if (ped !== VF.ped0 || impV !== VF.imp0) r.oa = false;
-    Object.assign(r, {tel: g('vfT'), acc: g('vfA'), ped, imp: impV, prox: g('vfX'), pot: $('vfO').value, del: $('vfL').value, nuevo: $('vfN').checked});
+    Object.assign(r, {tel: g('vfT'), acc: g('vfA'), com: g('vfCo'), ped, imp: impV, prox: g('vfX'), pot: $('vfO').value, del: $('vfL').value, nuevo: $('vfN').checked});
+    // si estaba marcado como no localizado ese día, ya no lo está
+    const wi = wk(VF.k).inf; if (wi.cerr) wi.cerr = wi.cerr.filter(c => !(c.d === r.d && cliKey(c.cli) === cliKey(cli)));
     if (r.nuevo && !inCL(cli)) {
       const c = {n: cli}; if (r.tel) c.t = r.tel;
       CL.push(c); CL.sort((a, b) => a.n.localeCompare(b.n, 'es')); saveC();
@@ -1344,29 +1423,29 @@ function xPlan(k, pl) {
 }
 function xInf(k, inf) {
   const si = infSt(inf), rows = sortR(inf.rows), a = XL + 2, R = [];
-  R.push(xR(1, 25.5, xFill('ABCDEFGHIJ', 14, 'INFORME SEMANAL DE VISITAS — SEMANA EN VIGOR')));
+  R.push(xR(1, 25.5, xFill('ABCDEFGHIJK', 14, 'INFORME SEMANAL DE VISITAS — SEMANA EN VIGOR')));
   R.push(xR(3, 34.5, [['A', 1, 'Vendedor:'], ['C', 15, V.vend], ['D', 15], ['E', 1, 'Zona / Ruta:'], ['G', 22, V.zona], ['H', 15]]));
   R.push(xR(4, 25.5, [['A', 1, 'Semana (del/al):'], ['C', 15, `del ${dmy(k)} al ${dmy(addD(k, 6))}`], ['D', 15], ['E', 1, 'Fecha de entrega:'], ['G', 17, inf.ent ? xSer(inf.ent) : null], ['H', 15]]));
-  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Teléfono', 'Acción realizada', '¿Pedido?', 'Importe (€)', 'Próximas acciones', 'Potencial', 'Visita c/ Delegado', '¿Cliente nuevo?'].map((t, i) => ['ABCDEFGHIJ'[i], 2, t])));
+  R.push(xR(6, 27.75, ['Día', 'Cliente', 'Teléfono', 'Acción realizada', '¿Pedido?', 'Importe (€)', 'Próximas acciones', 'Potencial', 'Visita c/ Delegado', '¿Cliente nuevo?', 'Comentarios'].map((t, i) => ['ABCDEFGHIJK'[i], 2, t])));
   for (let i = 0; i < MAXV; i++) {
     const r = rows[i], n = 7 + i;
-    if (!r) { R.push(xR(n, 18, [['A', 10], ['B', 3], ['C', 3], ['D', 3], ['E', 5], ['F', 6], ['G', 3], ['H', 5], ['I', 5], ['J', 5]])); continue; }
-    R.push(xR(n, xHt(18, [[r.cli, 22], [r.acc, 26], [r.prox, 24]]), [['A', 10, xSer(r.d)], ['B', 3, r.cli], ['C', 3, r.tel], ['D', 3, r.acc], ['E', 5, r.ped || 'No'],
-      ['F', 6, r.ped === 'Sí' && r.imp != null ? +r.imp : null], ['G', 3, r.prox], ['H', 5, r.pot || 'No'], ['I', 5, r.del || 'No'], ['J', 5, r.nuevo ? 'Sí' : 'No']]));
+    if (!r) { R.push(xR(n, 18, [['A', 10], ['B', 3], ['C', 3], ['D', 3], ['E', 5], ['F', 6], ['G', 3], ['H', 5], ['I', 5], ['J', 5], ['K', 3]])); continue; }
+    R.push(xR(n, xHt(18, [[r.cli, 22], [r.acc, 26], [r.prox, 24], [r.com, 40]]), [['A', 10, xSer(r.d)], ['B', 3, r.cli], ['C', 3, r.tel], ['D', 3, r.acc], ['E', 5, r.ped || 'No'],
+      ['F', 6, r.ped === 'Sí' && r.imp != null ? +r.imp : null], ['G', 3, r.prox], ['H', 5, r.pot || 'No'], ['I', 5, r.del || 'No'], ['J', 5, r.nuevo ? 'Sí' : 'No'], ['K', 3, r.com]]));
   }
-  R.push(xR(a, 18, xFill('ABCDEFGHIJ', 18, 'Resumen de control semanal')));
+  R.push(xR(a, 18, xFill('ABCDEFGHIJK', 18, 'Resumen de control semanal')));
   const sum = (n, l1, s1, v1, l2, v2) => xR(n, 18, [['A', 19, l1], ['B', 19], ['C', 19], ['D', s1, v1], ['E', 19, l2], ['F', 19], ['G', 19], ['H', 20, v2], ['I', 20]]);
   R.push(sum(a + 1, 'Nº total de visitas', 7, {f: `COUNTA(B7:B${XL})`, v: si.n}, 'Nº de pedidos conseguidos', {f: `COUNTIF(E7:E${XL},"Sí")`, v: si.ped}));
   R.push(sum(a + 2, 'Importe total de pedidos', 8, {f: `SUM(F7:F${XL})`, v: si.imp}, 'Nuevos clientes captados', {f: `COUNTIF(J7:J${XL},"Sí")`, v: si.nue}));
   R.push(sum(a + 3, 'Km recorridos', 7, si.km, 'Clientes potenciales detectados', {f: `COUNTIFS(B7:B${XL},"<>",H7:H${XL},"Sí")`, v: si.pot}));
   R.push(sum(a + 4, 'Clientes no localizados / cerrados', 7, si.noLoc, 'Incidencias o reclamaciones', si.inc));
-  R.push(xR(a + 6, 18, xFill('ABCDEFGHIJ', 18, 'Observaciones generales y plan para la semana siguiente')));
+  R.push(xR(a + 6, 18, xFill('ABCDEFGHIJK', 18, 'Observaciones generales y plan para la semana siguiente')));
   const hc = Math.max(19.5, xHt(19.5, [[inf.obs, 160]]) / 3);
-  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGHIJ', 21, j ? null : inf.obs)));
+  for (let j = 0; j < 3; j++) R.push(xR(a + 7 + j, hc, xFill('ABCDEFGHIJK', 21, j ? null : inf.obs)));
   R.push(xR(a + 11, 0, [['A', 4, 'Firma del Vendedor:'], ['E', 4, 'Firma del Delegado:']]));
-  const m = ['A1:J1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:J${a}`, `A${a + 6}:J${a + 6}`, `A${a + 7}:J${a + 9}`];
+  const m = ['A1:K1', 'C3:D3', 'G3:H3', 'C4:D4', 'G4:H4', `A${a}:K${a}`, `A${a + 6}:K${a + 6}`, `A${a + 7}:K${a + 9}`];
   for (let j = 1; j <= 4; j++) m.push(`A${a + j}:C${a + j}`, `E${a + j}:G${a + j}`, `H${a + j}:I${a + j}`);
-  return {last: a + 11, xml: xSheet({dim: `A1:J${a + 11}`, fz: 6, sel: true, cols: [19.86, 22, 14, 26, 12, 12, 24, 10, 12, 11], rows: R, m, dv: [[`E7:E${XL} H7:J${XL}`, 'Sí,No']]})};
+  return {last: a + 11, xml: xSheet({dim: `A1:K${a + 11}`, fz: 6, sel: true, cols: [19.86, 22, 14, 26, 12, 12, 24, 10, 12, 11, 40], rows: R, m, dv: [[`E7:E${XL} H7:J${XL}`, 'Sí,No']]})};
 }
 function xCmp(k, pl, inf, ia) {
   const sp = planSt(pl), si = infSt(inf), rows = sortR(pl.rows), L = 14 + MAXV, IS = `'${XSN[1]}'!`, R = [];
@@ -1386,7 +1465,7 @@ function xCmp(k, pl, inf, ia) {
   for (let i = 0; i < MAXV; i++) {
     const r = rows[i] || {}, n = 15 + i;
     R.push(xR(n, xHt(19.5, [[r.cli, 26]]), [['A', 12, r.d ? xSer(r.d) : null], ['B', 3, r.cli], ['C', 3, r.tipo], ['D', 5, r.prio],
-      ['E', 5, {f: `IF(B${n}="","",IF(COUNTIF(${IS}$B$7:$B$${XL},B${n})>0,"Sí","No"))`, v: r.cli ? (visited(r, inf) ? 'Sí' : 'No') : ''}], ['F', 3]]));
+      ['E', 5, {f: `IF(B${n}="","",IF(COUNTIF(${IS}$B$7:$B$${XL},B${n})>0,"Sí","No"))`, v: r.cli ? (visited(r, inf) ? 'Sí' : 'No') : ''}], ['F', 3, r.cli && !visited(r, inf) && isCerr(inf, r.cli) ? 'No localizado / cerrado' : null]]));
   }
   const z = L + 2;
   R.push(xR(z, 18, [['A', 19, 'Visitas planificadas realmente visitadas'], ['B', 19], ['C', 19], ['D', 19], ['E', 20, {f: `COUNTIF(E15:E${L},"Sí")&" / "&COUNTA(B15:B${L})`, v: `${vis} / ${sp.n}`}], ['F', 20]]));
@@ -1422,7 +1501,7 @@ function buildVisXlsx(k) {
   syncOrders(k);
   const w = wk(k), next = wk(addD(k, 7));
   const s1 = xPlan(addD(k, 7), next.plan), s2 = xInf(k, w.inf), s3 = xCmp(k, w.plan, w.inf, XL + 2);
-  const pa = [`'${XSN[0]}'!$A$1:$H$${s1.last}`, `'${XSN[1]}'!$A$1:$J$${s2.last}`, `'${XSN[2]}'!$A$1:$F$${s3.last}`];
+  const pa = [`'${XSN[0]}'!$A$1:$H$${s1.last}`, `'${XSN[1]}'!$A$1:$K$${s2.last}`, `'${XSN[2]}'!$A$1:$F$${s3.last}`];
   const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/', CT = 'application/vnd.openxmlformats-officedocument.';
   return zipStore([
     ['[Content_Types].xml', X + `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${CT}spreadsheetml.sheet.main+xml"/>${[1, 2, 3].map(i => `<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="${CT}spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="${CT}spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="${CT}theme+xml"/></Types>`],
@@ -1646,7 +1725,7 @@ $('goPed').addEventListener('click', () => show('Ped'));
 $('goHist').addEventListener('click', () => { openCli = null; openOrd = null; show('Hist'); });
 $('goDat').addEventListener('click', () => show('Dat'));
 $('goEst').addEventListener('click', () => { estCli = ''; estYear = null; show('Est'); });
-$('goVis').addEventListener('click', () => { visWk = monOf(new Date()); visTab = 'inf'; show('Vis'); });
+$('goVis').addEventListener('click', () => { visWk = monOf(new Date()); visTab = 'hoy'; show('Vis'); });
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show('Cat')));
 
 // Dentro de la app Android: abrir WhatsApp directamente y botón atrás
