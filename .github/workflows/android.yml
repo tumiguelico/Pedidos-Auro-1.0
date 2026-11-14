@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -39,3 +42,13 @@ jobs:
         with:
           name: TarifaPedidos-apk
           path: "**/build/outputs/apk/debug/app-debug.apk"
+      - name: Publicar APK (enlace directo)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          APK=$(find . -path "*build/outputs/apk/debug/app-debug.apk" | head -n 1)
+          cp "$APK" TarifaPedidos.apk
+          gh release delete ultima --yes --cleanup-tag || true
+          gh release create ultima TarifaPedidos.apk --target "$GITHUB_SHA" --title "Ultima version" --notes "APK compilado automaticamente. Descarga TarifaPedidos.apk desde la tablet e instalalo."
